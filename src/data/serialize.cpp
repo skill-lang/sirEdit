@@ -62,12 +62,10 @@ struct ViewData {
 	shared_ptr<RawData> raw;
 
 	vector<Tool> tools;
-	function<ViewData()> newView;
-	function<ViewData()> previousView;
 };
 
 sirEdit::data::View::View(shared_ptr<void> raw) {
-	this->__raw = move(static_pointer_cast<void>(make_shared<ViewData>((ViewData) {move(static_pointer_cast<RawData>(raw)), {}, nullptr, nullptr})));
+	this->__raw = move(static_pointer_cast<void>(make_shared<ViewData>((ViewData) {move(static_pointer_cast<RawData>(raw)), {}})));
 }
 
 extern const vector<unique_ptr<Type>>& sirEdit::data::View::getTypes() const {
@@ -78,4 +76,23 @@ extern const vector<Type*>& sirEdit::data::View::getBaseTypes() const {
 }
 extern const vector<Tool>& sirEdit::data::View::getTools() const {
 	return static_pointer_cast<ViewData>(this->__raw)->tools;
+}
+
+extern View sirEdit::data::View::addTool(Tool tool) const {
+	auto viewData = static_pointer_cast<ViewData>(this->__raw);
+	View result = {viewData->raw};
+	auto newViewData = static_pointer_cast<ViewData>(result.__raw);
+
+	// New tools list
+	{
+		newViewData->tools.resize(viewData->tools.size());
+		size_t i = 0;
+		for(auto& j : viewData->tools) {
+			newViewData->tools[i] = j;
+			i++;
+		}
+		newViewData->tools[viewData->tools.size()] = tool;
+	}
+
+	return move(result);
 }

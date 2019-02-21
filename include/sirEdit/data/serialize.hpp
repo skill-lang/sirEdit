@@ -20,6 +20,8 @@ namespace sirEdit::data {
 			const std::vector<Type*>& getBaseTypes() const;
 			const std::vector<Tool>& getTools() const;
 
+			View addTool(Tool tool) const;
+
 			friend sirEdit::data::Serializer;
 	};
 

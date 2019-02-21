@@ -7,6 +7,7 @@ namespace sirEdit::data {
 			std::string name;
 
 		public:
+			Tool() {}
 			Tool(std::string name) : name(std::move(name)) {}
 
 			std::string& getName() { return this->name; }
