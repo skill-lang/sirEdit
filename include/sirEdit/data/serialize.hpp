@@ -16,6 +16,7 @@ namespace sirEdit::data {
 
 		public:
 			const std::vector<std::unique_ptr<Type>>& getTypes();
+			const std::vector<Type*>& getBaseTypes();
 
 			friend sirEdit::data::Serializer;
 	};

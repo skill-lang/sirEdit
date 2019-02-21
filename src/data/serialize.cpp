@@ -18,6 +18,7 @@ class RawData {
 		unique_ptr<SkillFile> skillFile;
 
 		vector<unique_ptr<Type>> allTypes;
+		vector<Type*> baseTypes;
 
 		RawData(SkillFile* sf) : skillFile(sf) {
 			// Load Typs
@@ -41,7 +42,7 @@ class RawData {
 
 					// Add references
 					for(auto i : types)
-						sirEdit::utils::updateBaseType(this->allTypes[i.second].get(), i.first, lookupTypes);
+						sirEdit::utils::updateBaseType(this->allTypes[i.second].get(), i.first, lookupTypes, this->baseTypes);
 				}
 			}
 		}
@@ -59,4 +60,7 @@ extern shared_ptr<Serializer> sirEdit::data::Serializer::openFile(const string& 
 
 extern const vector<unique_ptr<Type>>& sirEdit::data::View::getTypes() {
 	return static_pointer_cast<RawData>(this->__raw)->allTypes;
+}
+extern const vector<Type*>& sirEdit::data::View::getBaseTypes() {
+	return static_pointer_cast<RawData>(this->__raw)->baseTypes;
 }
