@@ -107,4 +107,65 @@
       </object>
     </child>
   </object>
+  <object class="GtkAssistant" id="NewToolDialog">
+    <property name="can_focus">False</property>
+    <property name="title" translatable="yes">New tool</property>
+    <property name="modal">True</property>
+    <property name="destroy_with_parent">True</property>
+    <property name="transient_for">mainWindow</property>
+    <property name="use_header_bar">0</property>
+    <child>
+      <object class="GtkGrid" id="NewToolDialogTmp">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="label" translatable="yes">Tool name: </property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkEntry" id="ToolName">
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+          </object>
+          <packing>
+            <property name="left_attach">1</property>
+            <property name="top_attach">0</property>
+          </packing>
+        </child>
+      </object>
+      <packing>
+        <property name="has_padding">False</property>
+      </packing>
+    </child>
+    <child>
+      <placeholder/>
+    </child>
+    <child>
+      <placeholder/>
+    </child>
+    <child>
+      <placeholder/>
+    </child>
+  </object>
+  <object class="GtkPopover">
+    <property name="name">Tools</property>
+    <property name="can_focus">False</property>
+    <property name="relative_to">ToolsButton</property>
+    <property name="position">bottom</property>
+    <property name="constrain_to">none</property>
+    <child>
+      <object class="GtkListBox">
+        <property name="name">ToolsList</property>
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+      </object>
+    </child>
+  </object>
 </interface>

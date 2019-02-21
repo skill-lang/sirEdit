@@ -87,6 +87,54 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 		});
 	}
 
+	// Tools pop-up
+
+	// New tool
+	{
+		Gtk::Button* newToolButton;
+		Gtk::Assistant* newToolAssistant;
+		Gtk::Entry* toolName;
+		Gtk::Widget* newToolDialogTmp;
+		mainWindowBuild->get_widget("ToolAddButton", newToolButton);
+		mainWindowBuild->get_widget("NewToolDialog", newToolAssistant);
+		mainWindowBuild->get_widget("ToolName", toolName);
+		mainWindowBuild->get_widget("NewToolDialogTmp", newToolDialogTmp);
+
+		// New dialog / close
+		{
+			newToolButton->signal_clicked().connect([newToolAssistant, toolName, newToolDialogTmp]() -> void {
+				newToolAssistant->set_current_page(0);
+				newToolAssistant->set_page_complete(*newToolDialogTmp, false);
+				toolName->set_text("");
+				newToolAssistant->show_all();
+			});
+
+			auto closeFunc = [newToolAssistant]() -> void {
+				newToolAssistant->hide();
+			};
+			newToolAssistant->signal_cancel().connect(closeFunc);
+			newToolAssistant->signal_close().connect(closeFunc);
+		}
+
+		// Dialog update checkers
+		{
+			auto updateCheck = [toolName, newToolDialogTmp, newToolAssistant]() -> void {
+				if(toolName->get_text() == "") {
+					newToolAssistant->set_page_complete(*newToolDialogTmp, false);
+					return;
+				}
+
+				// TODO: Check if tool exists
+
+				newToolAssistant->set_page_complete(*newToolDialogTmp, true);
+				return;
+			};
+			toolName->signal_changed().connect(updateCheck);
+		}
+
+		// TODO: Dialog finished
+	}
+
 	// Window
 	Gtk::ApplicationWindow* window;
 	{
