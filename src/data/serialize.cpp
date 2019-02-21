@@ -4,6 +4,7 @@
 #include <sirEdit/utils/conver.hpp>
 #include <unordered_map>
 #include <tuple>
+#include <functional>
 
 using namespace sir::api;
 using namespace sirEdit::data;
@@ -57,10 +58,24 @@ extern shared_ptr<Serializer> sirEdit::data::Serializer::openFile(const string& 
 //
 // View access
 //
+struct ViewData {
+	shared_ptr<RawData> raw;
+
+	vector<Tool> tools;
+	function<ViewData()> newView;
+	function<ViewData()> previousView;
+};
+
+sirEdit::data::View::View(shared_ptr<void> raw) {
+	this->__raw = move(static_pointer_cast<void>(make_shared<ViewData>((ViewData) {move(static_pointer_cast<RawData>(raw)), {}, nullptr, nullptr})));
+}
 
 extern const vector<unique_ptr<Type>>& sirEdit::data::View::getTypes() const {
-	return static_pointer_cast<RawData>(this->__raw)->allTypes;
+	return static_pointer_cast<ViewData>(this->__raw)->raw->allTypes;
 }
 extern const vector<Type*>& sirEdit::data::View::getBaseTypes() const {
-	return static_pointer_cast<RawData>(this->__raw)->baseTypes;
+	return static_pointer_cast<ViewData>(this->__raw)->raw->baseTypes;
+}
+extern const vector<Tool>& sirEdit::data::View::getTools() const {
+	return static_pointer_cast<ViewData>(this->__raw)->tools;
 }

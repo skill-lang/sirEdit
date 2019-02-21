@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <sirEdit/data/types.hpp>
+#include <sirEdit/data/tools.hpp>
 
 
 namespace sirEdit::data {
@@ -12,11 +13,12 @@ namespace sirEdit::data {
 		private:
 			std::shared_ptr<void> __raw;
 
-			View(std::shared_ptr<void> raw) : __raw(std::move(raw)) {}
+			View(std::shared_ptr<void> raw);
 
 		public:
 			const std::vector<std::unique_ptr<Type>>& getTypes() const;
 			const std::vector<Type*>& getBaseTypes() const;
+			const std::vector<Tool>& getTools() const;
 
 			friend sirEdit::data::Serializer;
 	};
