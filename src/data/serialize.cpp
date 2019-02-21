@@ -85,7 +85,7 @@ extern View sirEdit::data::View::addTool(Tool tool) const {
 
 	// New tools list
 	{
-		newViewData->tools.resize(viewData->tools.size());
+		newViewData->tools.resize(viewData->tools.size() + 1);
 		size_t i = 0;
 		for(auto& j : viewData->tools) {
 			newViewData->tools[i] = j;

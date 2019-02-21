@@ -3,6 +3,7 @@
 #include <sirEdit/main.hpp>
 
 #include <iostream>
+#include <list>
 
 using namespace std;
 
@@ -37,11 +38,16 @@ class FieldListModel : public Gtk::TreeModel::ColumnRecord
 static FieldListModel fieldListModel;
 static Glib::RefPtr<Gtk::TreeStore> fieldListData;
 
+static list<sirEdit::data::View> views;
+
 
 extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
 	// Load window when required
 	if(!mainWindowBuild)
 		mainWindowBuild = Gtk::Builder::create_from_file("data/gui/mainWindow.glade");
+
+	// First view
+	views.push_back(move(serializer->getView()));
 
 	// Types and field lists
 	{
@@ -88,51 +94,90 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 	}
 
 	// Tools pop-up
+	{
+		Gtk::Button* toolsButton;
+		Gtk::Popover* toolsPopover;
+		Gtk::ListBox* toolsList;
+		mainWindowBuild->get_widget("ToolsButton", toolsButton);
+		mainWindowBuild->get_widget("ToolsPopup", toolsPopover);
+		mainWindowBuild->get_widget("ToolsList", toolsList);
+
+		toolsButton->signal_clicked().connect([toolsList, toolsPopover, serializer]() -> void {
+			// Clear list
+			{
+				auto tmp = toolsList->get_children();
+				for(auto i : tmp) {
+					toolsList->remove(*i);
+					delete i;
+				}
+			}
+
+			// Rebuild list
+			{
+				auto& view = (--views.end())->getTools();
+				size_t pos = 0;
+				for(auto& i : view) {
+					Gtk::Label* name = new Gtk::Label(i.getName());
+					toolsList->insert(*name, pos);
+					pos++;
+					cout << "Tool: " << i.getName() << endl;
+				}
+			}
+
+			// Show
+			toolsPopover->show_all();
+		});
+	}
 
 	// New tool
 	{
 		Gtk::Button* newToolButton;
-		Gtk::Assistant* newToolAssistant;
+		Gtk::Dialog* newToolDialog;
 		Gtk::Entry* toolName;
-		Gtk::Widget* newToolDialogTmp;
+		Gtk::Button* toolFinish;
+		Gtk::Button* toolExit;
 		mainWindowBuild->get_widget("ToolAddButton", newToolButton);
-		mainWindowBuild->get_widget("NewToolDialog", newToolAssistant);
+		mainWindowBuild->get_widget("NewToolDialog", newToolDialog);
 		mainWindowBuild->get_widget("ToolName", toolName);
-		mainWindowBuild->get_widget("NewToolDialogTmp", newToolDialogTmp);
+		mainWindowBuild->get_widget("ToolNewAdd", toolFinish);
+		mainWindowBuild->get_widget("ToolNewExit", toolExit);
 
 		// New dialog / close
 		{
-			newToolButton->signal_clicked().connect([newToolAssistant, toolName, newToolDialogTmp]() -> void {
-				newToolAssistant->set_current_page(0);
-				newToolAssistant->set_page_complete(*newToolDialogTmp, false);
+			newToolButton->signal_clicked().connect([newToolDialog, toolName, toolExit]() -> void {
 				toolName->set_text("");
-				newToolAssistant->show_all();
+				toolExit->set_sensitive(false);
+				newToolDialog->show_all();
 			});
 
-			auto closeFunc = [newToolAssistant]() -> void {
-				newToolAssistant->hide();
+			auto closeFunc = [newToolDialog]() -> void {
+				newToolDialog->hide();
 			};
-			newToolAssistant->signal_cancel().connect(closeFunc);
-			newToolAssistant->signal_close().connect(closeFunc);
+			toolExit->signal_clicked().connect(closeFunc);
 		}
 
 		// Dialog update checkers
 		{
-			auto updateCheck = [toolName, newToolDialogTmp, newToolAssistant]() -> void {
+			auto updateCheck = [toolName, newToolDialog, toolExit]() -> void {
 				if(toolName->get_text() == "") {
-					newToolAssistant->set_page_complete(*newToolDialogTmp, false);
+					toolExit->set_sensitive(false);
 					return;
 				}
 
 				// TODO: Check if tool exists
 
-				newToolAssistant->set_page_complete(*newToolDialogTmp, true);
+				toolExit->set_sensitive(true);
 				return;
 			};
 			toolName->signal_changed().connect(updateCheck);
 		}
 
-		// TODO: Dialog finished
+		// Dialog finished
+		toolFinish->signal_clicked().connect([newToolDialog, toolName]() -> void {
+			newToolDialog->hide();
+			views.push_back(move((--views.end())->addTool({toolName->get_text()})));
+			// TODO: Open new tool view
+		});
 	}
 
 	// Window
