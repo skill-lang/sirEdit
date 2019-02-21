@@ -58,9 +58,9 @@ extern shared_ptr<Serializer> sirEdit::data::Serializer::openFile(const string& 
 // View access
 //
 
-extern const vector<unique_ptr<Type>>& sirEdit::data::View::getTypes() {
+extern const vector<unique_ptr<Type>>& sirEdit::data::View::getTypes() const {
 	return static_pointer_cast<RawData>(this->__raw)->allTypes;
 }
-extern const vector<Type*>& sirEdit::data::View::getBaseTypes() {
+extern const vector<Type*>& sirEdit::data::View::getBaseTypes() const {
 	return static_pointer_cast<RawData>(this->__raw)->baseTypes;
 }

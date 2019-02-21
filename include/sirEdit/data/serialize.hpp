@@ -15,8 +15,8 @@ namespace sirEdit::data {
 			View(std::shared_ptr<void> raw) : __raw(std::move(raw)) {}
 
 		public:
-			const std::vector<std::unique_ptr<Type>>& getTypes();
-			const std::vector<Type*>& getBaseTypes();
+			const std::vector<std::unique_ptr<Type>>& getTypes() const;
+			const std::vector<Type*>& getBaseTypes() const;
 
 			friend sirEdit::data::Serializer;
 	};
