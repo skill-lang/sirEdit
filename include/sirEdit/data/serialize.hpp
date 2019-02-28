@@ -39,4 +39,19 @@ namespace sirEdit::data {
 
 			static std::shared_ptr<Serializer> openFile(const std::string& file);
 	};
+
+	class HistoricalView {
+		private:
+			View staticView;
+			std::shared_ptr<void> data;
+
+		public:
+			HistoricalView(View view);
+
+			const View& getStaticView() const {
+				return this->staticView;
+			}
+
+			void addTool(Tool tool);
+	};
 }

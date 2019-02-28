@@ -11,42 +11,7 @@ using namespace std;
 static Glib::RefPtr<Gtk::Builder>* _mainWindowBuild = new Glib::RefPtr<Gtk::Builder>();
 static Glib::RefPtr<Gtk::Builder>& mainWindowBuild = *_mainWindowBuild;
 
-class TypeListModel : public Gtk::TreeModel::ColumnRecord
-{
-	public:
-		Gtk::TreeModelColumn<size_t> data_id;
-		Gtk::TreeModelColumn<Glib::ustring> data_name;
-
-		TypeListModel() {
-			this->add(data_id);
-			this->add(data_name);
-		}
-};
-static TypeListModel typeListModel;
-static Glib::RefPtr<Gtk::TreeStore> typeListData;
-
-class FieldListModel : public Gtk::TreeModel::ColumnRecord
-{
-	public:
-		Gtk::TreeModelColumn<Glib::ustring> data_name;
-
-		FieldListModel() {
-			this->add(data_name);
-		}
-};
-static FieldListModel fieldListModel;
-static Glib::RefPtr<Gtk::TreeStore> fieldListData;
-
-static list<sirEdit::data::View> views;
-
-inline void buildTreeSubRows(Gtk::TreeStore::Row& row, const sirEdit::data::Type* super) {
-	for(auto& i : super->getSubTypes()) {
-		Gtk::TreeStore::Row tmp = *(typeListData->append(row.children()));
-		tmp[typeListModel.data_id] = i->getID();
-		tmp[typeListModel.data_name] = i->getName();
-		buildTreeSubRows(tmp, i);
-	}
-}
+static sirEdit::data::HistoricalView* views;
 
 extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
 	// Load window when required
@@ -54,54 +19,11 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 		mainWindowBuild = Gtk::Builder::create_from_file("data/gui/mainWindow.glade");
 
 	// First view
-	views.push_back(move(serializer->getView()));
+	views = new sirEdit::data::HistoricalView(move(serializer->getView()));
 
-	// Types and field lists
-	{
-		Gtk::TreeView* treeView;
-		mainWindowBuild->get_widget("ClassList", treeView);
-		typeListData = Gtk::TreeStore::create(typeListModel);
-		typeListData->set_sort_column(typeListModel.data_name, Gtk::SortType::SORT_ASCENDING);
-		if(!typeListData)
-			throw;
-
-		{
-			for(auto& i : views.begin()->getBaseTypes()) {
-				Gtk::TreeStore::Row tmp = *(typeListData->append());
-				tmp[typeListModel.data_id] = i->getID();
-				tmp[typeListModel.data_name] = i->getName();
-				buildTreeSubRows(tmp, i);
-			}
-		}
-
-		treeView->set_model(typeListData);
-		treeView->set_search_column(typeListModel.data_name);
-		treeView->append_column("Types", typeListModel.data_name);
-		treeView->set_activate_on_single_click(true);
-		treeView->expand_all();
-		//treeView->set_expander_column(typeListModel.data_name);
-
-		Gtk::TreeView* fields;
-		mainWindowBuild->get_widget("ItemList", fields);
-		fieldListData = Gtk::TreeStore::create(fieldListModel);
-		fieldListData->set_sort_column(fieldListModel.data_name, Gtk::SortType::SORT_ASCENDING);
-		fields->set_model(fieldListData);
-		fields->set_search_column(fieldListModel.data_name);
-		fields->append_column("Name", fieldListModel.data_name);
-
-		treeView->signal_row_activated().connect([serializer, fields](const Gtk::TreeModel::Path& path, Gtk::TreeViewColumn* column) -> void {
-			Gtk::TreeModel::iterator iter = typeListData->get_iter(path);
-			if(iter) {
-				Gtk::TreeModel::Row row = *iter;
-				fieldListData->clear();
-				sirEdit::data::TypeWithFields* type = static_cast<sirEdit::data::TypeWithFields*>(serializer->getView().getTypes()[row[typeListModel.data_id]].get());
-				for(auto& i: type->getFields()) {
-					Gtk::TreeStore::Row tmp = *(fieldListData->append());
-					tmp[fieldListModel.data_name] = i.getName();
-				}
-			}
-		});
-	}
+	// Notebook
+	Gtk::Notebook* notebook;
+	mainWindowBuild->get_widget("Notebook", notebook);
 
 	// Tools pop-up
 	{
@@ -112,7 +34,7 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 		mainWindowBuild->get_widget("ToolsPopup", toolsPopover);
 		mainWindowBuild->get_widget("ToolsList", toolsList);
 
-		toolsButton->signal_clicked().connect([toolsList, toolsPopover, serializer]() -> void {
+		toolsButton->signal_clicked().connect([toolsList, toolsPopover, serializer, notebook]() -> void {
 			// Clear list
 			{
 				auto tmp = toolsList->get_children();
@@ -124,10 +46,18 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 
 			// Rebuild list
 			{
-				auto& view = (--views.end())->getTools();
+				sirEdit::data::View view = views->getStaticView();
+				auto& tools = view.getTools();
 				size_t pos = 0;
-				for(auto& i : view) {
-					Gtk::Label* name = new Gtk::Label(i.getName());
+				for(auto& i : tools) {
+					Gtk::Button* name = new Gtk::Button(i.getName());
+					name->set_border_width(0);
+					std::string tmp_name = i.getName();
+					name->signal_clicked().connect([tmp_name, notebook, view]() -> void {
+						Gtk::Label* label = new Gtk::Label(tmp_name);
+						Gtk::Widget* content = createToolEdit(tmp_name, view);
+						notebook->append_page(*content, *label);
+					});
 					toolsList->insert(*name, pos);
 					pos++;
 				}
@@ -184,7 +114,7 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 		// Dialog finished
 		toolFinish->signal_clicked().connect([newToolDialog, toolName]() -> void {
 			newToolDialog->hide();
-			views.push_back(move((--views.end())->addTool({toolName->get_text()})));
+			views->addTool({toolName->get_text()});
 			// TODO: Open new tool view
 		});
 	}
