@@ -9,11 +9,14 @@
 
 #include "gui/startupWindow.hpp"
 
+#include <sirEdit/data/serialize.hpp>
+
 using namespace sir::api;
 using namespace std;
 
 namespace sirEdit {
 	Gtk::Application* mainApplication;
+	sirEdit::data::HistoricalView* views = nullptr;
 	static Glib::Dispatcher* dispatcher;
 	static list<std::function<void()>> dispatcher_funcs;
 	static mutex dispatcher_mutex;
@@ -61,7 +64,10 @@ int main(int args, char** argv) {
 		});
 		sirEdit::gui::runStartupWindow();
 	});
-	return application->run(args, argv);
+	auto reuslt = application->run(args, argv);
+	if(sirEdit::views != nullptr)
+		delete sirEdit::views;
+	return reuslt;
 
 	// GTK startup
 	//Gtk::Main gtkMain(args, argv);

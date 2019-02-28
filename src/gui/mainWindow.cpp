@@ -6,13 +6,14 @@
 #include <unordered_map>
 
 using namespace std;
+using namespace sirEdit;
 
 
 // INFO: Hack to to protect crashes after main program
 static Glib::RefPtr<Gtk::Builder>* _mainWindowBuild = new Glib::RefPtr<Gtk::Builder>();
 static Glib::RefPtr<Gtk::Builder>& mainWindowBuild = *_mainWindowBuild;
 
-static sirEdit::data::HistoricalView* views;
+
 static unordered_map<string, int> tabs;
 
 extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
