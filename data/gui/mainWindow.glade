@@ -88,54 +88,6 @@
       </object>
     </child>
   </object>
-  <object class="GtkPaned">
-    <property name="visible">True</property>
-    <property name="can_focus">True</property>
-    <child>
-      <object class="GtkScrolledWindow">
-        <property name="width_request">300</property>
-        <property name="visible">True</property>
-        <property name="can_focus">True</property>
-        <property name="shadow_type">in</property>
-        <child>
-          <object class="GtkTreeView" id="ClassList">
-            <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <property name="search_column">0</property>
-            <property name="enable_grid_lines">vertical</property>
-            <child internal-child="selection">
-              <object class="GtkTreeSelection"/>
-            </child>
-          </object>
-        </child>
-      </object>
-      <packing>
-        <property name="resize">False</property>
-        <property name="shrink">False</property>
-      </packing>
-    </child>
-    <child>
-      <object class="GtkScrolledWindow">
-        <property name="width_request">100</property>
-        <property name="visible">True</property>
-        <property name="can_focus">True</property>
-        <property name="shadow_type">in</property>
-        <child>
-          <object class="GtkTreeView" id="ItemList">
-            <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <child internal-child="selection">
-              <object class="GtkTreeSelection"/>
-            </child>
-          </object>
-        </child>
-      </object>
-      <packing>
-        <property name="resize">True</property>
-        <property name="shrink">False</property>
-      </packing>
-    </child>
-  </object>
   <object class="GtkImage" id="image1">
     <property name="visible">True</property>
     <property name="can_focus">False</property>

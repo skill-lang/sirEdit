@@ -3,6 +3,7 @@
 #include <sirEdit/main.hpp>
 
 #include <list>
+#include <unordered_map>
 
 using namespace std;
 
@@ -12,6 +13,7 @@ static Glib::RefPtr<Gtk::Builder>* _mainWindowBuild = new Glib::RefPtr<Gtk::Buil
 static Glib::RefPtr<Gtk::Builder>& mainWindowBuild = *_mainWindowBuild;
 
 static sirEdit::data::HistoricalView* views;
+static unordered_map<string, int> tabs;
 
 extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
 	// Load window when required
@@ -51,12 +53,27 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 				size_t pos = 0;
 				for(auto& i : tools) {
 					Gtk::Button* name = new Gtk::Button(i.getName());
-					name->set_border_width(0);
+					name->set_property("relief", Gtk::RELIEF_NONE);
 					std::string tmp_name = i.getName();
-					name->signal_clicked().connect([tmp_name, notebook, view]() -> void {
-						Gtk::Label* label = new Gtk::Label(tmp_name);
-						Gtk::Widget* content = createToolEdit(tmp_name, view);
-						notebook->append_page(*content, *label);
+					name->signal_clicked().connect([tmp_name, notebook, view, toolsPopover]() -> void {
+						if(tabs.find(tmp_name) == tabs.end()) {
+							Gtk::HBox* labelBox = new Gtk::HBox();
+							Gtk::Label* label = new Gtk::Label(tmp_name);
+							Gtk::Image* closeImage = new Gtk::Image(Gtk::Stock::CLOSE, Gtk::ICON_SIZE_BUTTON);
+							Gtk::Button* closeButon = new Gtk::Button();
+							// TODO: Close tab
+							closeButon->add(*closeImage);
+							closeButon->set_property("relief", Gtk::RELIEF_NONE);
+							labelBox->pack_start(*label);
+							labelBox->pack_end(*closeButon);
+							labelBox->show_all();
+							Gtk::Widget* content = createToolEdit(tmp_name, view);
+							tabs[tmp_name] = notebook->append_page(*content, *labelBox);
+							notebook->set_current_page(tabs[tmp_name]);
+						}
+						else
+							notebook->set_current_page(tabs[tmp_name]);
+						toolsPopover->hide();
 					});
 					toolsList->insert(*name, pos);
 					pos++;
@@ -97,15 +114,20 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 
 		// Dialog update checkers
 		{
-			auto updateCheck = [toolName, newToolDialog, toolExit]() -> void {
-				if(toolName->get_text() == "") {
-					toolExit->set_sensitive(false);
+			auto updateCheck = [toolName, newToolDialog, toolFinish]() -> void {
+				string text = toolName->get_text();
+				if(text == "") {
+					toolFinish->set_sensitive(false);
 					return;
 				}
 
-				// TODO: Check if tool exists
+				for(auto i : views->getStaticView().getTools())
+					if(i.getName() == text) {
+						toolFinish->set_sensitive(false);
+						return;
+					}
 
-				toolExit->set_sensitive(true);
+				toolFinish->set_sensitive(true);
 				return;
 			};
 			toolName->signal_changed().connect(updateCheck);
