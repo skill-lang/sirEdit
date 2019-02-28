@@ -30,6 +30,7 @@ class RawData {
 				unordered_map<sir::UserdefinedType*, size_t> types;
 				for(sir::UserdefinedType& i : sf->UserdefinedType->all()) {
 					this->allTypes[counter] = move(sirEdit::utils::genBaseType(&i));
+					this->allTypes[counter]->getID() = counter;
 					types[&i] = counter;
 					counter++;
 				}
@@ -41,9 +42,31 @@ class RawData {
 					for(auto i : types)
 						lookupTypes[i.first] = this->allTypes[i.second].get();
 
-					// Add references
-					for(auto i : types)
-						sirEdit::utils::updateBaseType(this->allTypes[i.second].get(), i.first, lookupTypes, this->baseTypes);
+					// Add interfaces
+					for(auto& i : sf->InterfaceType->all())
+						if(i.getSuper() != nullptr)
+							lookupTypes[i.getSuper()]->getSubTypes().push_back(lookupTypes[&i]);
+
+					// Add classes
+					for(auto &i : sf->ClassType->all())
+						if(i.getSuper() != nullptr)
+							lookupTypes[i.getSuper()]->getSubTypes().push_back(lookupTypes[&i]);
+				}
+
+				// Pahse 3: search unreferenced
+				for(auto& i : this->allTypes) {
+					bool good = true;
+					for(auto& j : this->allTypes) {
+						for(auto& k : j->getSubTypes())
+							if(k == i.get()) {
+								good = false;
+								break;
+							}
+						if(!good)
+							break;
+					}
+					if(good)
+						this->baseTypes.push_back(i.get());
 				}
 			}
 		}

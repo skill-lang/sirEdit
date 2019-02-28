@@ -2,7 +2,6 @@
 #include "mainWindow.hpp"
 #include <sirEdit/main.hpp>
 
-#include <iostream>
 #include <list>
 
 using namespace std;
@@ -40,6 +39,14 @@ static Glib::RefPtr<Gtk::TreeStore> fieldListData;
 
 static list<sirEdit::data::View> views;
 
+inline void buildTreeSubRows(Gtk::TreeStore::Row& row, const sirEdit::data::Type* super) {
+	for(auto& i : super->getSubTypes()) {
+		Gtk::TreeStore::Row tmp = *(typeListData->append(row.children()));
+		tmp[typeListModel.data_id] = i->getID();
+		tmp[typeListModel.data_name] = i->getName();
+		buildTreeSubRows(tmp, i);
+	}
+}
 
 extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
 	// Load window when required
@@ -58,18 +65,21 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 		if(!typeListData)
 			throw;
 
-		size_t counter = 0;
-		for(auto& i : serializer->getView().getTypes()) {
-			Gtk::TreeStore::Row tmp = *(typeListData->append());
-			tmp[typeListModel.data_id] = counter;
-			tmp[typeListModel.data_name] = i->getName();
-			counter++;
+		{
+			for(auto& i : views.begin()->getBaseTypes()) {
+				Gtk::TreeStore::Row tmp = *(typeListData->append());
+				tmp[typeListModel.data_id] = i->getID();
+				tmp[typeListModel.data_name] = i->getName();
+				buildTreeSubRows(tmp, i);
+			}
 		}
 
 		treeView->set_model(typeListData);
 		treeView->set_search_column(typeListModel.data_name);
 		treeView->append_column("Types", typeListModel.data_name);
 		treeView->set_activate_on_single_click(true);
+		treeView->expand_all();
+		//treeView->set_expander_column(typeListModel.data_name);
 
 		Gtk::TreeView* fields;
 		mainWindowBuild->get_widget("ItemList", fields);
@@ -120,7 +130,6 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 					Gtk::Label* name = new Gtk::Label(i.getName());
 					toolsList->insert(*name, pos);
 					pos++;
-					cout << "Tool: " << i.getName() << endl;
 				}
 			}
 

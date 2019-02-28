@@ -12,6 +12,7 @@ namespace sirEdit::data
 			std::string __name;
 			std::string __comment;
 			std::vector<Type*> __subTypes;
+			size_t __id = -1;
 
 		public:
 			Type(std::string name, std::string comment) : __name(std::move(name)), __comment(std::move(comment)) {}
@@ -20,9 +21,11 @@ namespace sirEdit::data
 			const std::string& getName() const { return this->__name; }
 			const std::string& getComment() const { return this->__comment; }
 			const std::vector<Type*>& getSubTypes() const { return this->__subTypes; }
+			const size_t getID() const { return this->__id; }
 			std::string& getName() { return this->__name; }
 			std::string& getComment() { return this->__comment; }
 			std::vector<Type*>& getSubTypes() { return this->__subTypes; }
+			size_t& getID() { return this->__id; }
 	};
 	class TypeWithFields : public Type {
 		private:
