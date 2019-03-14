@@ -22,6 +22,8 @@ namespace sirEdit::data {
 
 			View addTool(Tool tool) const;
 
+			bool saveToFile();
+
 			friend sirEdit::data::Serializer;
 	};
 
@@ -47,6 +49,7 @@ namespace sirEdit::data {
 
 		public:
 			HistoricalView(View view);
+			~HistoricalView();
 
 			const View& getStaticView() const {
 				return this->staticView;

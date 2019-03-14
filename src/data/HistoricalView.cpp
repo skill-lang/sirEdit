@@ -13,6 +13,9 @@ struct HistoricalData {
 sirEdit::data::HistoricalView::HistoricalView(View view) : staticView(move(view)) {
 	this->data = static_pointer_cast<void>(make_shared<HistoricalData>());
 }
+sirEdit::data::HistoricalView::~HistoricalView() {
+	// TODO: Check that thread stopped and all is safed
+}
 
 void sirEdit::data::HistoricalView::addTool(Tool tool) {
 	this->staticView = this->staticView.addTool(tool);

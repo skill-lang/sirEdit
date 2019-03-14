@@ -17,11 +17,12 @@ using namespace std;
 class RawData {
 	public:
 		unique_ptr<SkillFile> skillFile;
+		std::string file;
 
 		vector<unique_ptr<Type>> allTypes;
 		vector<Type*> baseTypes;
 
-		RawData(SkillFile* sf) : skillFile(sf) {
+		RawData(SkillFile* sf, std::string file) : skillFile(sf), file(move(file)) {
 			// Load Typs
 			{
 				// Phase 1: gen Types
@@ -73,8 +74,8 @@ class RawData {
 };
 
 extern shared_ptr<Serializer> sirEdit::data::Serializer::openFile(const string& file) {
-	SkillFile* sf = SkillFile::read(file);
-	Serializer* result = new Serializer(std::move(std::static_pointer_cast<void>(std::make_shared<RawData>(sf))));
+	SkillFile* sf = SkillFile::open(file);
+	Serializer* result = new Serializer(std::move(std::static_pointer_cast<void>(std::make_shared<RawData>(sf, file))));
 	return move(shared_ptr<Serializer>(result));
 }
 
@@ -118,4 +119,26 @@ extern View sirEdit::data::View::addTool(Tool tool) const {
 	}
 
 	return move(result);
+}
+
+extern bool sirEdit::data::View::saveToFile() {
+	ViewData* viewData = static_pointer_cast<ViewData>(this->__raw).get();
+
+	// Remoe old tools
+	for(auto& i: *(viewData->raw->skillFile->Tool)) {
+		// TODO: delete
+	}
+
+	// Add tools
+	for(auto& i : viewData->tools) {
+		sir::Tool* tool = viewData->raw->skillFile->Tool->add();
+		{
+			auto tmp = viewData->raw->skillFile->strings->add(i.getName().c_str());
+			tool->setName(tmp);
+		}
+	}
+
+	// Save
+	viewData->raw->skillFile->flush();
+	return true;
 }
