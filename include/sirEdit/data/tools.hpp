@@ -1,5 +1,9 @@
 #pragma once
 #include <string>
+#include <tuple>
+#include <unordered_map>
+
+#include <sirEdit/data/fields.hpp>
 
 namespace sirEdit::data {
 	class Tool {

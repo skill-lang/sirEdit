@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,7 +17,7 @@ namespace sirEdit::data {
 			View(std::shared_ptr<void> raw);
 
 		public:
-			const std::vector<std::unique_ptr<Type>>& getTypes() const;
+			const std::vector<Type*>& getTypes() const;
 			const std::vector<Type*>& getBaseTypes() const;
 			const std::vector<Tool>& getTools() const;
 
@@ -56,5 +57,6 @@ namespace sirEdit::data {
 			}
 
 			void addTool(Tool tool);
+			void setFieldStatus(const Tool& tool, Type& type, Field& field, FIELD_STATE state, const std::function<void(const Type&, const Field&, FIELD_STATE, FIELD_STATE)>& callback_field, const std::function<void(const Type&, FIELD_STATE, FIELD_STATE)>& callback_type);
 	};
 }
