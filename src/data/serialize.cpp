@@ -1,10 +1,13 @@
 #include <File.h>
 #include <TypesOfType.h>
+#include <sirEdit/main.hpp>
 #include <sirEdit/data/serialize.hpp>
 #include <sirEdit/utils/conver.hpp>
 #include <unordered_map>
 #include <tuple>
 #include <functional>
+
+#include <iostream>
 
 using namespace sir::api;
 using namespace sirEdit::data;
@@ -14,12 +17,19 @@ using namespace std;
 // Serializer (read/write)
 //
 
+inline void checkSuper(const Type* type) {
+	auto tmp = getSuper(*type);
+	if(tmp != nullptr)
+		checkSuper(tmp);
+}
+
 class RawData {
 	public:
 		unique_ptr<SkillFile> skillFile;
 		std::string file;
+		vector<shared_ptr<Type>> allTypes;
 
-		vector<unique_ptr<Type>> allTypes;
+		vector<Type*> allTypesAccess;
 		vector<Type*> baseTypes;
 
 		RawData(SkillFile* sf, std::string file) : skillFile(sf), file(move(file)) {
@@ -27,14 +37,21 @@ class RawData {
 			{
 				// Phase 1: gen Types
 				this->allTypes.resize(sf->UserdefinedType->size());
+				this->allTypesAccess.resize(sf->UserdefinedType->size());
 				size_t counter = 0;
 				unordered_map<sir::UserdefinedType*, size_t> types;
 				for(sir::UserdefinedType& i : sf->UserdefinedType->all()) {
 					this->allTypes[counter] = move(sirEdit::utils::genBaseType(&i));
 					this->allTypes[counter]->getID() = counter;
+					this->allTypesAccess[counter] = this->allTypes[counter].get();
+					cout << "Address " << getSuper(*this->allTypesAccess[counter]) << endl;
 					types[&i] = counter;
 					counter++;
 				}
+
+
+				for(auto& i: this->allTypes)
+					checkSuper(i.get());
 
 				// Phase 2: reference types
 				{
@@ -45,13 +62,21 @@ class RawData {
 
 					// Add interfaces
 					for(auto& i : sf->InterfaceType->all())
-						if(i.getSuper() != nullptr)
+						if(i.getSuper() != nullptr) {
 							lookupTypes[i.getSuper()]->getSubTypes().push_back(lookupTypes[&i]);
+							dynamic_cast<TypeInterface*>(lookupTypes[&i])->getSuper() = lookupTypes[i.getSuper()];
+						}
+						else
+							dynamic_cast<TypeInterface*>(lookupTypes[&i])->getSuper() = nullptr;
 
 					// Add classes
 					for(auto &i : sf->ClassType->all())
-						if(i.getSuper() != nullptr)
+						if(i.getSuper() != nullptr) {
 							lookupTypes[i.getSuper()]->getSubTypes().push_back(lookupTypes[&i]);
+							dynamic_cast<TypeClass*>(lookupTypes[&i])->getSuper() = lookupTypes[i.getSuper()];
+						}
+						else
+							dynamic_cast<TypeClass*>(lookupTypes[&i])->getSuper() = nullptr;
 				}
 
 				// Pahse 3: search unreferenced
@@ -69,6 +94,10 @@ class RawData {
 					if(good)
 						this->baseTypes.push_back(i.get());
 				}
+
+				// Phase 4: Check super
+				for(auto& i: this->allTypes)
+					checkSuper(i.get());
 			}
 		}
 };
@@ -76,6 +105,7 @@ class RawData {
 extern shared_ptr<Serializer> sirEdit::data::Serializer::openFile(const string& file) {
 	SkillFile* sf = SkillFile::open(file);
 	Serializer* result = new Serializer(std::move(std::static_pointer_cast<void>(std::make_shared<RawData>(sf, file))));
+	views = new HistoricalView(result->getView());
 	return move(shared_ptr<Serializer>(result));
 }
 
@@ -92,8 +122,8 @@ sirEdit::data::View::View(shared_ptr<void> raw) {
 	this->__raw = move(static_pointer_cast<void>(make_shared<ViewData>((ViewData) {move(static_pointer_cast<RawData>(raw)), {}})));
 }
 
-extern const vector<unique_ptr<Type>>& sirEdit::data::View::getTypes() const {
-	return static_pointer_cast<ViewData>(this->__raw)->raw->allTypes;
+extern const vector<Type*>& sirEdit::data::View::getTypes() const {
+	return static_pointer_cast<ViewData>(this->__raw)->raw->allTypesAccess;
 }
 extern const vector<Type*>& sirEdit::data::View::getBaseTypes() const {
 	return static_pointer_cast<ViewData>(this->__raw)->raw->baseTypes;

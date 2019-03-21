@@ -5,6 +5,8 @@
 #include <TypesOfType.h>
 #include <unordered_map>
 
+#include <iostream>
+
 namespace sirEdit::utils {
 	template<class SOURCE>
 	inline std::string _getName(SOURCE* type) {
@@ -27,16 +29,17 @@ namespace sirEdit::utils {
 		}
 		return std::move(std::make_unique<sirEdit::data::TypeWithFields>(_getName(source), "", fields)); // TODO: Add comments
 	}
-	inline std::unique_ptr<sirEdit::data::Type> genBaseType(sir::UserdefinedType* uf) {
+	inline std::shared_ptr<sirEdit::data::Type> genBaseType(sir::UserdefinedType* uf) {
 		std::string skillType = uf->skillName();
-		std::unique_ptr<sirEdit::data::Type> result;
+		std::shared_ptr<sirEdit::data::Type> result;
 		if(skillType == sir::ClassType::typeName) {
 			std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(uf)));
-			result = std::move(std::make_unique<sirEdit::data::TypeClass>(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr));
+			result = std::move(std::make_shared<sirEdit::data::TypeClass>(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr));
 		}
 		else if(skillType == sir::InterfaceType::typeName) {
 			std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(uf)));
-			result = std::move(std::make_unique<sirEdit::data::TypeInterface>(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr));
+			result = std::make_shared<sirEdit::data::TypeInterface>(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
+			std::cout << "Test: " << sirEdit::data::getSuper(*result.get()) << std::endl;
 		}
 		else
 			throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
