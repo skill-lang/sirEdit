@@ -68,7 +68,7 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 							labelBox->pack_start(*label);
 							labelBox->pack_end(*closeButon);
 							labelBox->show_all();
-							Gtk::Widget* content = createToolEdit(tmp_name, view);
+							Gtk::Widget* content = createToolEdit(tmp_name);
 							tabs[tmp_name] = notebook->append_page(*content, *labelBox);
 							notebook->set_current_page(tabs[tmp_name]);
 						}
