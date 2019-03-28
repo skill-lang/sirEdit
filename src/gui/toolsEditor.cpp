@@ -99,12 +99,13 @@ class Tab : public Gtk::HPaned
 		Gtk::TreeView view_right;
 
 		std::unordered_map<string, sirEdit::data::Field*> field_lookup;
+		std::unordered_map<const Type*, Gtk::TreeStore::Row> type_lookup;
 
 		//
 		// General functions
 		//
 		/**
-		 * Set the state of an fields row entry.
+		 * Set the state of a fields row entry.
 		 * @param row The row witch should be set.
 		 * @param all The state witch is set transitive from other tabs.
 		 * @param set The current set state from this type.
@@ -135,6 +136,36 @@ class Tab : public Gtk::HPaned
 		}
 
 		/**
+		 * Set the state of a type row entry
+		 * @param row The row witch should be set.
+		 * @param transitive The state witch is computed from other types.
+		 * @param set The current state of the type.
+		 */
+		void typeUpdate(Gtk::TreeStore::Row row, TYPE_STATE transitive, TYPE_STATE set) {
+			// Unset
+			row[typeListModel.data_status_no] = false;
+			row[typeListModel.data_status_u] = false;
+			row[typeListModel.data_status_u_transitive] = false;
+			row[typeListModel.data_status_r] = false;
+			row[typeListModel.data_status_r_transitive] = false;
+			row[typeListModel.data_status_w] = false;
+			row[typeListModel.data_status_w_transitive] = false;
+			row[typeListModel.data_status_d] = false;
+			row[typeListModel.data_status_d_transitive] = false;
+
+			// Set
+			row[typeListModel.data_status_no] = set == TYPE_STATE::NO;
+			row[typeListModel.data_status_u] = set == TYPE_STATE::UNUSED;
+			row[typeListModel.data_status_u_transitive] = transitive <= TYPE_STATE::UNUSED & set != TYPE_STATE::UNUSED;
+			row[typeListModel.data_status_r] = set == TYPE_STATE::READ;
+			row[typeListModel.data_status_r_transitive] = transitive >= TYPE_STATE::READ & set != TYPE_STATE::READ;
+			row[typeListModel.data_status_w] = set == TYPE_STATE::WRITE;
+			row[typeListModel.data_status_w_transitive] = transitive >= TYPE_STATE::WRITE & set != TYPE_STATE::WRITE;
+			row[typeListModel.data_status_d] = set == TYPE_STATE::DELETE;
+			row[typeListModel.data_status_d_transitive] = transitive >= TYPE_STATE::DELETE & set != TYPE_STATE::DELETE;
+		}
+
+		/**
 		 * Search the local state of the field of the current type.
 		 * @param field The field to search.
 		 * @return Current state of a field in this tool for the current state.
@@ -160,6 +191,8 @@ class Tab : public Gtk::HPaned
 				Gtk::TreeStore::Row tmp = *(typeListData->append(row.children()));
 				tmp[typeListModel.data_id] = i->getID();
 				tmp[typeListModel.data_name] = i->getName();
+				this->typeUpdate(tmp, views->getStaticView().getTypeTransitive(this->tool, *i), views->getStaticView().getTypeSet(this->tool, *i));
+				type_lookup[i] = tmp;
 				buildTreeSubRows(tmp, *i);
 			}
 		}
@@ -208,6 +241,8 @@ class Tab : public Gtk::HPaned
 			if(iter) {
 				// Find type
 				Gtk::TreeModel::Row row = *iter;
+				if(views->getStaticView().getTypes().size() <= row[typeListModel.data_id])
+					throw; // That should NEVER happen!
 				const sirEdit::data::Type* type = views->getStaticView().getTypes()[row[typeListModel.data_id]];
 				this->currentType = const_cast<Type*>(type);
 
@@ -221,12 +256,21 @@ class Tab : public Gtk::HPaned
 				this->view_right.expand_all();
 			}
 		}
+		void event_type_changed(const Glib::ustring& path, TYPE_STATE state) {
+			Gtk::TreeModel::iterator iter = this->typeListData->get_iter(path);
+			if(iter) {
+				// Find type
+				Gtk::TreeModel::Row row = *iter;
+				const sirEdit::data::Type* type = views->getStaticView().getTypes().at(row[typeListModel.data_id]);
 
-		void event_type_changed(Glib::ustring i, TYPE_STATE state) {
-
+				// Update row
+				views->setTypeStatus(this->tool, *const_cast<Type*>(type), state, [this](const Type& type, TYPE_STATE transitive, TYPE_STATE set) -> void {
+					this->typeUpdate(this->type_lookup[&type], transitive, set);
+				});
+			}
 		}
 
-		void event_field_changed(Glib::ustring id, FIELD_STATE state) {
+		void event_field_changed(const Glib::ustring& id, FIELD_STATE state) {
 			// Find row
 			auto row = this->fieldListData->get_iter(id);
 			if(!row)
@@ -240,8 +284,8 @@ class Tab : public Gtk::HPaned
 			// Set field state
 			views->setFieldStatus(this->tool, *(this->currentType), *(field->second), state, [this, &id](const Type& type, const Field& field, FIELD_STATE tool_state, FIELD_STATE type_state) -> void {
 				this->fieldUpdate(*(this->fieldListData->get_iter(id)), tool_state, type_state);
-			}, [](const Type& type, FIELD_STATE tool_state, FIELD_STATE set_state) -> void {
-
+			}, [this, &id](const Type& type, TYPE_STATE tool_state, TYPE_STATE set_state) -> void {
+				this->typeUpdate(this->type_lookup.find(&type)->second, tool_state, set_state);
 			});
 		}
 
@@ -272,6 +316,8 @@ class Tab : public Gtk::HPaned
 						tmp[typeListModel.data_id] = i->getID();
 						tmp[typeListModel.data_name] = i->getName();
 						this->buildTreeSubRows(tmp, *i);
+						this->type_lookup[i] = tmp;
+						this->typeUpdate(tmp, views->getStaticView().getTypeTransitive(this->tool, *i), views->getStaticView().getTypeSet(this->tool, *i));
 					}
 				}
 
@@ -315,7 +361,7 @@ class Tab : public Gtk::HPaned
 				{
 					auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
 					tmp->signal_toggled().connect([this](Glib::ustring test) -> void {
-						this->event_type_changed(test, TYPE_STATE::UNUSED);
+						this->event_type_changed(test, TYPE_STATE::WRITE);
 					});
 					tmp->set_property("radio", true);
 					this->view_left.append_column("w", *tmp);
@@ -325,7 +371,7 @@ class Tab : public Gtk::HPaned
 				{
 					auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
 					tmp->signal_toggled().connect([this](Glib::ustring test) -> void {
-						this->event_type_changed(test, TYPE_STATE::UNUSED);
+						this->event_type_changed(test, TYPE_STATE::DELETE);
 					});
 					tmp->set_property("radio", true);
 					this->view_left.append_column("d", *tmp);
@@ -343,10 +389,11 @@ class Tab : public Gtk::HPaned
 
 			// Field list
 			{
+				// Generate storage
 				this->fieldListData = Gtk::TreeStore::create(fieldListModel);
-				this->fieldListData->set_sort_column(fieldListModel.data_sort_name, Gtk::SortType::SORT_ASCENDING);
 				this->view_right.set_model(fieldListData);
-				this->view_right.set_search_column(fieldListModel.data_sort_name);
+
+				// Create model
 				{
 					auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
 					tmp->signal_toggled().connect([this](Glib::ustring id) -> void {
@@ -403,6 +450,9 @@ class Tab : public Gtk::HPaned
 					this->view_right.get_column(4)->add_attribute(tmp->property_activatable(),fieldListModel.data_status_active);
 				}
 				this->view_right.append_column("Name", fieldListModel.data_name);
+
+				// Set display options
+				this->view_right.set_search_column(fieldListModel.data_sort_name);
 				this->view_right.set_expander_column(*(this->view_right.get_column(5)));
 			}
 		}

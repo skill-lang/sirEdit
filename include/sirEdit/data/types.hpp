@@ -22,33 +22,52 @@ namespace sirEdit::data
 			std::string __comment;
 			std::vector<Type*> __subTypes;
 			size_t __id = -1;
-			TYPE_STATE __state = TYPE_STATE::NO;
+			std::unordered_map<Tool*, TYPE_STATE> __state;
+			std::unordered_map<Tool*, uint64_t> __countFieldsSet;
 
 		public:
+			Type(const Type& type) : __name(type.__name), __comment(type.__comment) {}
 			Type(std::string name, std::string comment) : __name(std::move(name)), __comment(std::move(comment)) {}
 			virtual ~Type() {}
 
 			operator TypeWithFields*();
 			operator const TypeWithFields*() const;
 
+			Type& operator =(const Type&) = delete;
+			Type& operator =(Type&& data) = delete;
+
 			const std::string& getName() const { return this->__name; }
 			const std::string& getComment() const { return this->__comment; }
 			const std::vector<Type*>& getSubTypes() const { return this->__subTypes; }
 			const size_t getID() const { return this->__id; }
-			const TYPE_STATE& getState() const { return this->__state; }
+			const std::unordered_map<Tool*, TYPE_STATE>& getState() const { return this->__state; }
+			const std::unordered_map<Tool*, uint64_t>& getCountFieldsSet() const { return this->__countFieldsSet; }
 			std::string& getName() { return this->__name; }
 			std::string& getComment() { return this->__comment; }
 			std::vector<Type*>& getSubTypes() { return this->__subTypes; }
 			size_t& getID() { return this->__id; }
-			TYPE_STATE& getState() { return this->__state; }
+			std::unordered_map<Tool*, TYPE_STATE>& getState() { return this->__state; }
+			std::unordered_map<Tool*, uint64_t>& getCountFieldsSet() { return this->__countFieldsSet; }
+
+			TYPE_STATE getToolSet(const Tool& tool) const {
+				auto tmp = this->__state.find(const_cast<Tool*>(&tool));
+				if(tmp == this->__state.end())
+					return TYPE_STATE::NO;
+				else
+					return tmp->second;
+			}
 	};
 	class TypeWithFields : public Type {
 		private:
 			std::vector<Field> __fields;
 
 		public:
+			TypeWithFields(const TypeWithFields& twf) : Type(twf), __fields(twf.__fields)  {}
 			TypeWithFields(std::string name, std::string comment, std::vector<Field> fields) : Type(std::move(name), std::move(comment)), __fields(std::move(fields)) {}
-			TypeWithFields(Type type, std::vector<Field> fields) : Type(std::move(type)), __fields(std::move(fields)) {}
+			TypeWithFields(const Type& type, std::vector<Field> fields) : Type(type), __fields(std::move(fields)) {}
+
+			TypeWithFields& operator =(const TypeWithFields&) = delete;
+			TypeWithFields& operator =(TypeWithFields&&) = delete;
 
 			const std::vector<Field>& getFields() const { return this->__fields; }
 			std::vector<Field>& getFields() { return this->__fields; }
@@ -60,8 +79,8 @@ namespace sirEdit::data
 
 		public:
 			TypeInterface(std::string name, std::string comment, std::vector<Field> fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(name), std::move(comment), std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
-			TypeInterface(Type type, std::vector<Field> fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(type), std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
-			TypeInterface(TypeWithFields fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
+			TypeInterface(const Type& type, std::vector<Field> fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(type, std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
+			TypeInterface(const TypeWithFields& fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(fields), __interfaces(std::move(interfaces)), __super(super) {}
 
 			const std::vector<TypeInterface*>& getInterfaces() const { return this->__interfaces; }
 			const Type* getSuper() const { return this->__super; }
@@ -75,8 +94,8 @@ namespace sirEdit::data
 
 		public:
 			TypeClass(std::string name, std::string comment, std::vector<Field> fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(name), std::move(comment), std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
-			TypeClass(Type type, std::vector<Field> fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(type), std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
-			TypeClass(TypeWithFields fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
+			TypeClass(const Type& type, std::vector<Field> fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(type), std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
+			TypeClass(const TypeWithFields& fields, std::vector<TypeInterface*> interfaces, Type* super) : TypeWithFields(std::move(fields)), __interfaces(std::move(interfaces)), __super(super) {}
 
 			const std::vector<TypeInterface*>& getInterfaces() const { return this->__interfaces; }
 			const Type* getSuper() const { return this->__super; }

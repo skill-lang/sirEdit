@@ -34,6 +34,19 @@ namespace sirEdit::data {
 			std::string& getType() { return this->type; }
 			std::unordered_map<Tool*, std::unordered_map<Type*, FIELD_STATE>>& getStates() { return this->__states; }
 
+			FIELD_STATE getToolSet(const Tool& tool, const Type& type) {
+				// Find tool
+				auto tmp_tool = this->__states.find(const_cast<Tool*>(&tool));
+				if(tmp_tool == this->__states.end())
+					return FIELD_STATE::NO;
+
+				// Find entry
+				auto tmp_entry = tmp_tool->second.find(const_cast<Type*>(&type));
+				if(tmp_entry == tmp_tool->second.end())
+					return FIELD_STATE::NO;
+				else
+					return tmp_entry->second;
+			}
 			FIELD_STATE getToolType(const Tool& tool) const {
 				FIELD_STATE state = FIELD_STATE::UNUSED;
 				auto tmp = this->__states.find(const_cast<Tool*>(&tool));
