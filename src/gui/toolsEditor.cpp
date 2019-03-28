@@ -42,7 +42,6 @@ class TypeListModel : public Gtk::TreeModel::ColumnRecord
 		}
 };
 static TypeListModel typeListModel;
-//static Glib::RefPtr<Gtk::TreeStore> typeListData;
 
 //
 // Field tree
@@ -81,7 +80,6 @@ class FieldListModel : public Gtk::TreeModel::ColumnRecord
 		}
 };
 static FieldListModel fieldListModel;
-//static Glib::RefPtr<Gtk::TreeStore> fieldListData;
 
 /**
  * Manage a complete tab.
