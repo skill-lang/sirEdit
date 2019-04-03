@@ -115,13 +115,13 @@ namespace sirEdit::data {
 				{
 					auto tmp = this->__statesType.find(&type);
 					if(tmp != this->__statesType.end())
-						result = std::get<1>(tmp->second);
+						result = std::max(std::get<1>(tmp->second), result);
 				}
 
 				// Check for parents delete
 				{
 					const Type* current = getSuper(type);
-					while(current) {
+					while(current != nullptr) {
 						auto tmp = this->__statesType.find(current);
 						if((tmp != this->__statesType.end()) && (std::get<1>(tmp->second) == TYPE_STATE::DELETE))
 							return TYPE_STATE::DELETE;
