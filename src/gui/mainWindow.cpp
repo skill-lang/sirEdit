@@ -7,6 +7,8 @@
 
 using namespace std;
 using namespace sirEdit;
+using namespace sirEdit::data;
+using namespace sirEdit::gui;
 
 
 // INFO: Hack to to protect crashes after main program
@@ -15,6 +17,23 @@ static Glib::RefPtr<Gtk::Builder>& mainWindowBuild = *_mainWindowBuild;
 
 
 static unordered_map<string, int> tabs;
+
+inline void event_create_tab(Tool& tool, Gtk::Notebook& notebook) {
+	Gtk::HBox* labelBox = new Gtk::HBox();
+	Gtk::Label* label = new Gtk::Label(tool.getName());
+	Gtk::Image* closeImage = new Gtk::Image(Gtk::Stock::CLOSE, Gtk::ICON_SIZE_BUTTON);
+	Gtk::Button* closeButon = new Gtk::Button();
+	// TODO: Close tab
+	closeButon->add(*closeImage);
+	closeButon->set_property("relief", Gtk::RELIEF_NONE);
+	labelBox->pack_start(*label);
+	labelBox->pack_end(*closeButon);
+	labelBox->show_all();
+	Gtk::Widget* content = createToolEdit(tool.getName());
+	auto tmp = notebook.append_page(*content, *labelBox);
+	tabs[tool.getName()] = tmp;
+	notebook.set_current_page(tmp);
+}
 
 extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
 	// Load window when required
@@ -55,25 +74,11 @@ extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> s
 				for(auto& i : tools) {
 					Gtk::Button* name = new Gtk::Button(i.getName());
 					name->set_property("relief", Gtk::RELIEF_NONE);
-					std::string tmp_name = i.getName();
-					name->signal_clicked().connect([tmp_name, notebook, view, toolsPopover]() -> void {
-						if(tabs.find(tmp_name) == tabs.end()) {
-							Gtk::HBox* labelBox = new Gtk::HBox();
-							Gtk::Label* label = new Gtk::Label(tmp_name);
-							Gtk::Image* closeImage = new Gtk::Image(Gtk::Stock::CLOSE, Gtk::ICON_SIZE_BUTTON);
-							Gtk::Button* closeButon = new Gtk::Button();
-							// TODO: Close tab
-							closeButon->add(*closeImage);
-							closeButon->set_property("relief", Gtk::RELIEF_NONE);
-							labelBox->pack_start(*label);
-							labelBox->pack_end(*closeButon);
-							labelBox->show_all();
-							Gtk::Widget* content = createToolEdit(tmp_name);
-							tabs[tmp_name] = notebook->append_page(*content, *labelBox);
-							notebook->set_current_page(tabs[tmp_name]);
-						}
+					name->signal_clicked().connect([&i, notebook, toolsPopover]() -> void {
+						if(tabs.find(i.getName()) == tabs.end())
+							event_create_tab(const_cast<Tool&>(i), *notebook);
 						else
-							notebook->set_current_page(tabs[tmp_name]);
+							notebook->set_current_page(tabs[i.getName()]);
 						toolsPopover->hide();
 					});
 					toolsList->insert(*name, pos);

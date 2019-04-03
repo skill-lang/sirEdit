@@ -22,8 +22,6 @@ namespace sirEdit::data
 			std::string __comment;
 			std::vector<Type*> __subTypes;
 			size_t __id = -1;
-			std::unordered_map<Tool*, TYPE_STATE> __state;
-			std::unordered_map<Tool*, uint64_t> __countFieldsSet;
 
 		public:
 			Type(const Type& type) : __name(type.__name), __comment(type.__comment) {}
@@ -40,22 +38,10 @@ namespace sirEdit::data
 			const std::string& getComment() const { return this->__comment; }
 			const std::vector<Type*>& getSubTypes() const { return this->__subTypes; }
 			const size_t getID() const { return this->__id; }
-			const std::unordered_map<Tool*, TYPE_STATE>& getState() const { return this->__state; }
-			const std::unordered_map<Tool*, uint64_t>& getCountFieldsSet() const { return this->__countFieldsSet; }
 			std::string& getName() { return this->__name; }
 			std::string& getComment() { return this->__comment; }
 			std::vector<Type*>& getSubTypes() { return this->__subTypes; }
 			size_t& getID() { return this->__id; }
-			std::unordered_map<Tool*, TYPE_STATE>& getState() { return this->__state; }
-			std::unordered_map<Tool*, uint64_t>& getCountFieldsSet() { return this->__countFieldsSet; }
-
-			TYPE_STATE getToolSet(const Tool& tool) const {
-				auto tmp = this->__state.find(const_cast<Tool*>(&tool));
-				if(tmp == this->__state.end())
-					return TYPE_STATE::NO;
-				else
-					return tmp->second;
-			}
 	};
 	class TypeWithFields : public Type {
 		private:

@@ -16,45 +16,19 @@ namespace sirEdit::data {
 	class Type;
 	class Field {
 		private:
-			std::string name;
-			std::string comment;
-			std::string type;
-			std::unordered_map<Tool*, std::unordered_map<Type*, FIELD_STATE>> __states;
+			std::string __name;
+			std::string __comment;
+			std::string __type;
 
 		public:
 			Field() {}
-			Field(std::string name, std::string comment, std::string type) : name(name), comment(comment), type(type) {}
+			Field(std::string name, std::string comment, std::string type) : __name(name), __comment(comment), __type(type) {}
 
-			const std::string& getName() const { return this->name; }
-			const std::string& getComment() const { return this->comment; }
-			const std::string& getType() const { return this->type; }
-			const std::unordered_map<Tool*, std::unordered_map<Type*, FIELD_STATE>>& getStates() const { return this->__states; }
-			std::string& getName() { return this->name; }
-			std::string& getComment() { return this->comment; }
-			std::string& getType() { return this->type; }
-			std::unordered_map<Tool*, std::unordered_map<Type*, FIELD_STATE>>& getStates() { return this->__states; }
-
-			FIELD_STATE getToolSet(const Tool& tool, const Type& type) {
-				// Find tool
-				auto tmp_tool = this->__states.find(const_cast<Tool*>(&tool));
-				if(tmp_tool == this->__states.end())
-					return FIELD_STATE::NO;
-
-				// Find entry
-				auto tmp_entry = tmp_tool->second.find(const_cast<Type*>(&type));
-				if(tmp_entry == tmp_tool->second.end())
-					return FIELD_STATE::NO;
-				else
-					return tmp_entry->second;
-			}
-			FIELD_STATE getToolType(const Tool& tool) const {
-				FIELD_STATE state = FIELD_STATE::UNUSED;
-				auto tmp = this->__states.find(const_cast<Tool*>(&tool));
-				if(tmp == this->__states.end())
-					return state;
-				for(auto& i : tmp->second)
-					state = std::max(state, i.second);
-				return state;
-			}
+			const std::string& getName() const { return this->__name; }
+			const std::string& getComment() const { return this->__comment; }
+			const std::string& getType() const { return this->__type; }
+			std::string& getName() { return this->__name; }
+			std::string& getComment() { return this->__comment; }
+			std::string& getType() { return this->__type; }
 	};
 }

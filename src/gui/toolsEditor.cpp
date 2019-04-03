@@ -165,24 +165,6 @@ class Tab : public Gtk::HPaned
 			row[typeListModel.data_status_d_transitive] = transitive >= TYPE_STATE::DELETE & set != TYPE_STATE::DELETE;
 		}
 
-		/**
-		 * Search the local state of the field of the current type.
-		 * @param field The field to search.
-		 * @return Current state of a field in this tool for the current state.
-		 */
-		FIELD_STATE getFieldState(const Field& field) {
-			// Find tool
-			auto tmp_tool = field.getStates().find(&(this->tool));
-			if(tmp_tool == field.getStates().end())
-				return FIELD_STATE::NO;
-
-			// Search status
-			auto tmp_state = tmp_tool->second.find(this->currentType);
-			if(tmp_state == tmp_tool->second.end())
-				return FIELD_STATE::NO;
-			return tmp_state->second;
-		}
-
 		//
 		// Generators
 		//
@@ -191,7 +173,7 @@ class Tab : public Gtk::HPaned
 				Gtk::TreeStore::Row tmp = *(typeListData->append(row.children()));
 				tmp[typeListModel.data_id] = i->getID();
 				tmp[typeListModel.data_name] = i->getName();
-				this->typeUpdate(tmp, views->getStaticView().getTypeTransitive(this->tool, *i), views->getStaticView().getTypeSet(this->tool, *i));
+				this->typeUpdate(tmp, this->tool.getTypeTransitiveState(*i), this->tool.getTypeSetState(*i));
 				type_lookup[i] = tmp;
 				buildTreeSubRows(tmp, *i);
 			}
@@ -228,7 +210,7 @@ class Tab : public Gtk::HPaned
 						tmp[fieldListModel.data_sort_name] = std::string("b_") + i.getName();
 						tmp[fieldListModel.data_status_active] = true;
 						this->field_lookup[i.getName()] = const_cast<Field*>(&i);
-						this->fieldUpdate(tmp, i.getToolType(this->tool), getFieldState(i));
+						this->fieldUpdate(tmp, this->tool.getFieldTransitiveState(i), this->tool.getFieldSetState(i, *fields));
 					}
 			}
 		}
@@ -317,7 +299,7 @@ class Tab : public Gtk::HPaned
 						tmp[typeListModel.data_name] = i->getName();
 						this->buildTreeSubRows(tmp, *i);
 						this->type_lookup[i] = tmp;
-						this->typeUpdate(tmp, views->getStaticView().getTypeTransitive(this->tool, *i), views->getStaticView().getTypeSet(this->tool, *i));
+						this->typeUpdate(tmp, this->tool.getTypeTransitiveState(*i), this->tool.getTypeSetState(*i));
 					}
 				}
 
