@@ -89,6 +89,7 @@ class Tab : public Gtk::HPaned
 	private:
 		Tool& tool;
 		Type* currentType;
+		HistoricalView& historicalView;
 
 		Glib::RefPtr<Gtk::TreeStore> typeListData;
 		Glib::RefPtr<Gtk::TreeStore> fieldListData;
@@ -223,9 +224,9 @@ class Tab : public Gtk::HPaned
 			if(iter) {
 				// Find type
 				Gtk::TreeModel::Row row = *iter;
-				if(views->getStaticView().getTypes().size() <= row[typeListModel.data_id])
+				if(this->historicalView.getStaticView().getTypes().size() <= row[typeListModel.data_id])
 					throw; // That should NEVER happen!
-				const sirEdit::data::Type* type = views->getStaticView().getTypes()[row[typeListModel.data_id]];
+				const sirEdit::data::Type* type = this->historicalView.getStaticView().getTypes()[row[typeListModel.data_id]];
 				this->currentType = const_cast<Type*>(type);
 
 				// Generate list
@@ -243,10 +244,10 @@ class Tab : public Gtk::HPaned
 			if(iter) {
 				// Find type
 				Gtk::TreeModel::Row row = *iter;
-				const sirEdit::data::Type* type = views->getStaticView().getTypes().at(row[typeListModel.data_id]);
+				const sirEdit::data::Type* type = this->historicalView.getStaticView().getTypes().at(row[typeListModel.data_id]);
 
 				// Update row
-				views->setTypeStatus(this->tool, *const_cast<Type*>(type), state, [this](const Type& type, TYPE_STATE transitive, TYPE_STATE set) -> void {
+				this->historicalView.setTypeStatus(this->tool, *const_cast<Type*>(type), state, [this](const Type& type, TYPE_STATE transitive, TYPE_STATE set) -> void {
 					this->typeUpdate(this->type_lookup[&type], transitive, set);
 				});
 			}
@@ -264,7 +265,7 @@ class Tab : public Gtk::HPaned
 				throw; // That should NEVER happen!
 
 			// Set field state
-			views->setFieldStatus(this->tool, *(this->currentType), *(field->second), state, [this, &id](const Type& type, const Field& field, FIELD_STATE tool_state, FIELD_STATE type_state) -> void {
+			this->historicalView.setFieldStatus(this->tool, *(this->currentType), *(field->second), state, [this, &id](const Type& type, const Field& field, FIELD_STATE tool_state, FIELD_STATE type_state) -> void {
 				this->fieldUpdate(*(this->fieldListData->get_iter(id)), tool_state, type_state);
 			}, [this, &id](const Type& type, TYPE_STATE tool_state, TYPE_STATE set_state) -> void {
 				this->typeUpdate(this->type_lookup.find(&type)->second, tool_state, set_state);
@@ -272,9 +273,9 @@ class Tab : public Gtk::HPaned
 		}
 
 	public:
-		Tab(Tool& tool) : tool(tool), HPaned() {
+		Tab(Tool& tool, HistoricalView& historicalView) : tool(tool), historicalView(historicalView), HPaned() {
 			// General
-			const View& view = views->getStaticView();
+			const View& view = this->historicalView.getStaticView();
 
 			// Generate panes
 			this->scrollable_left.set_size_request(300, 200);
@@ -442,17 +443,17 @@ class Tab : public Gtk::HPaned
 //
 // Show widget
 //
-extern Gtk::Widget* sirEdit::gui::createToolEdit(std::string name) {
+extern Gtk::Widget* sirEdit::gui::createToolEdit(std::string name, HistoricalView& historicalView) {
 	// Search tool
 	Tool* tool = nullptr;
-	for(auto& i : views->getStaticView().getTools())
+	for(auto& i : historicalView.getStaticView().getTools())
 		if(i.getName() == name)
 			tool = const_cast<Tool*>(&i);
 	if(tool == nullptr)
 		throw; // That should NEVER happen.
 
 	// Create tab
-	Tab* tab =  new Tab(*tool);
+	Tab* tab =  new Tab(*tool, historicalView);
 	tab->show_all();
 	return tab;
 }

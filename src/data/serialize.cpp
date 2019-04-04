@@ -105,7 +105,6 @@ class RawData {
 extern shared_ptr<Serializer> sirEdit::data::Serializer::openFile(const string& file) {
 	SkillFile* sf = SkillFile::open(file);
 	Serializer* result = new Serializer(std::move(std::static_pointer_cast<void>(std::make_shared<RawData>(sf, file))));
-	views = new HistoricalView(result->getView());
 	return move(shared_ptr<Serializer>(result));
 }
 

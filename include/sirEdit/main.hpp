@@ -5,7 +5,6 @@
 
 namespace sirEdit {
 	extern Gtk::Application* mainApplication;
-	extern sirEdit::data::HistoricalView* views;
 
 	extern void loadFile(Gtk::Window* window, Gtk::FileChooserNative* chooser);
 	extern void runInGui(std::function<void()> func);
