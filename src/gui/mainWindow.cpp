@@ -10,6 +10,20 @@ using namespace sirEdit;
 using namespace sirEdit::data;
 using namespace sirEdit::gui;
 
+class TmpModel : public Gtk::TreeModel::ColumnRecord
+{
+	public:
+		Gtk::TreeModelColumn<Glib::ustring> data_name;
+		Gtk::TreeModelColumn<bool> data_used;
+		Gtk::TreeModelColumn<bool> data_active;
+
+		TmpModel() {
+			this->add(data_used);
+			this->add(data_active);
+			this->add(data_name);
+		}
+};
+//static TmpModel tmpModel;
 
 class MainWindow {
 	private:
@@ -204,6 +218,99 @@ class MainWindow {
 					this->__historicalView.addTool({toolName->get_text(), toolDescription->get_buffer()->get_text(), toolCommand->get_buffer()->get_text()});
 					// TODO: Open new tool view
 				});
+			}
+
+			// TODO: Remove prototype
+			{
+				{
+					Gtk::TreeView* tools;
+					TmpModel* tmpModel = new TmpModel;
+					this->__builder->get_widget("OverviewTools", tools);
+					{
+						auto tmp = Gtk::TreeStore::create(*tmpModel);
+						auto tmp2 = *tmp->append();
+						tmp2[tmpModel->data_name] = "ToolA";
+						tmp2[tmpModel->data_used] = true;
+						tmp2[tmpModel->data_active] = true;
+						auto tmp3 = *tmp->append();
+						tmp3[tmpModel->data_name] = "ToolB";
+						tmp3[tmpModel->data_used] = true;
+						tmp3[tmpModel->data_active] = false;
+						auto tmp4 = *tmp->append();
+						tmp4[tmpModel->data_name] = "ToolC";
+						tmp4[tmpModel->data_used] = false;
+						tmp4[tmpModel->data_active] = false;
+						tools->set_model(tmp);
+					}
+					{
+						auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
+						tools->append_column("Active", *tmp);
+						tools->get_column(0)->add_attribute(tmp->property_active(), tmpModel->data_active);
+					}
+					{
+						auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
+						tmp->set_activatable(false);
+						tools->append_column("Used", *tmp);
+						tools->get_column(1)->add_attribute(tmp->property_active(), tmpModel->data_used);
+					}
+					{
+						tools->append_column("Tool", tmpModel->data_name);
+					}
+				}
+				{
+					Gtk::TreeView* tools;
+					TmpModel* tmpModel = new TmpModel;
+					this->__builder->get_widget("OverviewTypes", tools);
+					{
+						auto tmp = Gtk::TreeStore::create(*tmpModel);
+						auto tmp2 = *tmp->append();
+						tmp2[tmpModel->data_name] = "TypeExample";
+						tmp2[tmpModel->data_used] = true;
+						tmp2[tmpModel->data_active] = true;
+						tools->set_model(tmp);
+					}
+					{
+						auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
+						tools->append_column("Active", *tmp);
+						tools->get_column(0)->add_attribute(tmp->property_active(), tmpModel->data_active);
+					}
+					{
+						auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
+						tmp->set_activatable(false);
+						tools->append_column("Used", *tmp);
+						tools->get_column(1)->add_attribute(tmp->property_active(), tmpModel->data_used);
+					}
+					{
+						tools->append_column("Type", tmpModel->data_name);
+					}
+				}
+				{
+					Gtk::TreeView* tools;
+					TmpModel* tmpModel = new TmpModel;
+					this->__builder->get_widget("OverviewFields", tools);
+					{
+						auto tmp = Gtk::TreeStore::create(*tmpModel);
+						auto tmp2 = *tmp->append();
+						tmp2[tmpModel->data_name] = "exampleField";
+						tmp2[tmpModel->data_used] = true;
+						tmp2[tmpModel->data_active] = true;
+						tools->set_model(tmp);
+					}
+					{
+						auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
+						tools->append_column("Active", *tmp);
+						tools->get_column(0)->add_attribute(tmp->property_active(), tmpModel->data_active);
+					}
+					{
+						auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
+						tmp->set_activatable(false);
+						tools->append_column("Used", *tmp);
+						tools->get_column(1)->add_attribute(tmp->property_active(), tmpModel->data_used);
+					}
+					{
+						tools->append_column("Field", tmpModel->data_name);
+					}
+				}
 			}
 
 			// Make window visible
