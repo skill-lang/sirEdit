@@ -64,16 +64,54 @@ class MainWindow {
 				auto& tools = view.getTools();
 				size_t pos = 0;
 				for(auto& i : tools) {
-					Gtk::Button* name = new Gtk::Button(i.getName());
-					name->set_property("relief", Gtk::RELIEF_NONE);
-					name->signal_clicked().connect([&i, this]() -> void {
-						if(this->__tabs.find(i.getName()) == this->__tabs.end())
-							this->__create_tab(const_cast<Tool&>(i));
-						else
-							this->__notebook->set_current_page(this->__tabs[i.getName()]);
-						this->__toolsPopover->hide();
-					});
-					this->__toolsList->insert(*name, pos);
+					Gtk::VBox* main = Gtk::manage(new Gtk::VBox());
+					{
+						Gtk::HBox* top = Gtk::manage(new Gtk::HBox());
+						{
+							Gtk::Label* tmp = Gtk::manage(new Gtk::Label(i.getName()));
+							tmp->set_alignment(Gtk::ALIGN_START, Gtk::ALIGN_CENTER);
+							Gtk::Button* button = Gtk::manage(new Gtk::Button());
+							button->set_image(*tmp);
+							tmp->show_all();
+							top->pack_start(*(button), true, true);
+							button->set_relief(Gtk::RELIEF_NONE);
+							button->signal_clicked().connect([&i, this]() -> void {
+								if(this->__tabs.find(i.getName()) == this->__tabs.end())
+									this->__create_tab(const_cast<Tool&>(i));
+								else
+									this->__notebook->set_current_page(this->__tabs[i.getName()]);
+								this->__toolsPopover->hide();
+							});
+						}
+						{
+							Gtk::Button* button = Gtk::manage(new Gtk::Button());
+							button->set_relief(Gtk::RELIEF_NONE);
+							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::EXECUTE, Gtk::ICON_SIZE_BUTTON))));
+							top->pack_end(*button, false, true);
+						}
+						{
+							Gtk::Button* button = Gtk::manage(new Gtk::Button());
+							button->set_relief(Gtk::RELIEF_NONE);
+							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::PROPERTIES, Gtk::ICON_SIZE_BUTTON))));
+							top->pack_end(*button, false, true);
+						}
+						{
+							Gtk::Button* button = Gtk::manage(new Gtk::Button());
+							button->set_relief(Gtk::RELIEF_NONE);
+							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::DELETE, Gtk::ICON_SIZE_BUTTON))));
+							top->pack_end(*button, false, true);
+						}
+						main->pack_start(*top, true, true);
+					}
+					{
+						Gtk::Label* description = Gtk::manage(new Gtk::Label(i.getDescription()));
+						description->set_line_wrap_mode(Pango::WrapMode::WRAP_CHAR);
+						description->set_alignment(Gtk::ALIGN_START, Gtk::ALIGN_CENTER);
+						description->set_lines(1);
+						main->pack_end(*description, true, true);
+					}
+
+					this->__toolsList->insert(*main, pos);
 					pos++;
 				}
 			}
@@ -113,17 +151,23 @@ class MainWindow {
 				Gtk::Entry* toolName;
 				Gtk::Button* toolFinish;
 				Gtk::Button* toolExit;
+				Gtk::TextView* toolDescription;
+				Gtk::TextView* toolCommand;
 				this->__builder->get_widget("ToolAddButton", newToolButton);
 				this->__builder->get_widget("NewToolDialog", newToolDialog);
 				this->__builder->get_widget("ToolName", toolName);
 				this->__builder->get_widget("ToolNewAdd", toolFinish);
 				this->__builder->get_widget("ToolNewExit", toolExit);
+				this->__builder->get_widget("ToolDescription", toolDescription);
+				this->__builder->get_widget("ToolCommand", toolCommand);
 
 				// New dialog / close
 				{
-					newToolButton->signal_clicked().connect([newToolDialog, toolName, toolExit]() -> void {
+					newToolButton->signal_clicked().connect([newToolDialog, toolName, toolFinish, toolDescription, toolCommand]() -> void {
 						toolName->set_text("");
-						toolExit->set_sensitive(false);
+						toolDescription->set_buffer(Gtk::TextBuffer::create());
+						toolCommand->set_buffer(Gtk::TextBuffer::create());
+						toolFinish->set_sensitive(false);
 						newToolDialog->show_all();
 					});
 
@@ -155,9 +199,9 @@ class MainWindow {
 				}
 
 				// Dialog finished
-				toolFinish->signal_clicked().connect([this, newToolDialog, toolName]() -> void {
+				toolFinish->signal_clicked().connect([this, newToolDialog, toolName, toolDescription, toolCommand]() -> void {
 					newToolDialog->hide();
-					this->__historicalView.addTool({toolName->get_text()});
+					this->__historicalView.addTool({toolName->get_text(), toolDescription->get_buffer()->get_text(), toolCommand->get_buffer()->get_text()});
 					// TODO: Open new tool view
 				});
 			}

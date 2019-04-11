@@ -11,6 +11,8 @@ namespace sirEdit::data {
 	class Tool {
 		private:
 			std::string __name;
+			std::string __description;
+			std::string __command;
 
 			std::unordered_map<const Field*, std::unordered_map<const Type*, FIELD_STATE>> __statesFields;
 			std::unordered_map<const Type*, std::tuple<uint64_t, TYPE_STATE>> __statesType;
@@ -64,10 +66,14 @@ namespace sirEdit::data {
 
 		public:
 			Tool() {}
-			Tool(std::string name) : __name(std::move(name)) {}
+			Tool(std::string name, std::string description, std::string command) : __name(std::move(name)), __description(std::move(description)), __command(std::move(command)) {}
 
 			std::string& getName() { return this->__name; }
+			std::string& getDescription() { return this->__description; }
+			std::string& getCommand() { return this->__command; }
 			const std::string& getName() const { return this->__name; }
+			const std::string& getDescription() const { return this->__description; }
+			const std::string& getCommand() const{ return this->__command; }
 
 			//
 			// Get type/field states

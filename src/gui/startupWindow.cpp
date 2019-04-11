@@ -34,6 +34,31 @@ extern void sirEdit::gui::runStartupWindow() {
 		});
 	}
 
+	// TODO: Merge sir files
+	{
+		Gtk::Button* button;
+		Gtk::ApplicationWindow* window;
+		Gtk::ListBox* list;
+		startUpBuild->get_widget("Multispec", button);
+		startUpBuild->get_widget("MultispecWindow", window);
+		startUpBuild->get_widget("MultispecList", list);
+
+		auto tmp = new Gtk::HBox();
+		auto tmp_label = new Gtk::Label("/home/marko/Projekte/SkillEdit/sirEdit/skill.sir");
+		tmp_label->set_alignment(Gtk::Align::ALIGN_START, Gtk::Align::ALIGN_CENTER);
+		tmp->pack_start(*(tmp_label), true, true);
+		auto tmpButton = new Gtk::Button();
+		tmpButton->set_image(*(new Gtk::Image(Gtk::Stock::DELETE, Gtk::ICON_SIZE_BUTTON)));
+		tmpButton->set_relief(Gtk::RELIEF_NONE);
+
+		tmp->pack_end(*(tmpButton), false, true);
+		list->append(*tmp);
+
+		button->signal_clicked().connect([window]() -> void {
+			window->show_all();
+		});
+	}
+
 	// TODO: Info
 
 	// TODO: Import skill file
