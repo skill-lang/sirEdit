@@ -220,7 +220,12 @@ class MainWindow {
 				});
 			}
 
+			{
+				this->__notebook->append_page(*(Gtk::manage(createOverview(this->__historicalView))), "Overview");
+			}
+
 			// TODO: Remove prototype
+			if(false)
 			{
 				{
 					Gtk::TreeView* tools;
@@ -311,7 +316,64 @@ class MainWindow {
 						tools->append_column("Field", tmpModel->data_name);
 					}
 				}
+				{
+					Gtk::Button* button;
+					Gtk::Popover* over;
+					this->__builder->get_widget("ErrorButton", button);
+					this->__builder->get_widget("ErrorPopover", over);
+					button->signal_clicked().connect([over]() -> void {
+						over->show_all();
+					});
+				}
+				{
+					Gtk::Button* button;
+					Gtk::PopoverMenu* over;
+					this->__builder->get_widget("MenuButton", button);
+					this->__builder->get_widget("Menu", over);
+					button->signal_clicked().connect([over]() -> void {
+						over->show_all();
+					});
+				}
+				{
+					Gtk::TreeView* tools;
+					TmpModel* tmpModel = new TmpModel;
+					this->__builder->get_widget("ExportTools", tools);
+					{
+						auto tmp = Gtk::TreeStore::create(*tmpModel);
+						auto tmp2 = *tmp->append();
+						tmp2[tmpModel->data_name] = "ToolA";
+						tmp2[tmpModel->data_used] = true;
+						tmp2[tmpModel->data_active] = true;
+						auto tmp3 = *tmp->append();
+						tmp3[tmpModel->data_name] = "ToolB";
+						tmp3[tmpModel->data_used] = true;
+						tmp3[tmpModel->data_active] = true;
+						auto tmp4 = *tmp->append();
+						tmp4[tmpModel->data_name] = "ToolC";
+						tmp4[tmpModel->data_used] = false;
+						tmp4[tmpModel->data_active] = true;
+						tools->set_model(tmp);
+					}
+					{
+						auto tmp = Gtk::manage(new Gtk::CellRendererToggle());
+						tools->append_column("Export", *tmp);
+						tools->get_column(0)->add_attribute(tmp->property_active(), tmpModel->data_active);
+					}
+					{
+						tools->append_column("Tool", tmpModel->data_name);
+					}
+				}
+				{
+					Gtk::Dialog* dialog;
+					Gtk::Button* button;
+					this->__builder->get_widget("ExportButton", button);
+					this->__builder->get_widget("Export", dialog);
+					button->signal_clicked().connect([dialog]()-> void{
+						dialog->show_all();
+					});
+				}
 			}
+
 
 			// Make window visible
 			{

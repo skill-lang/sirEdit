@@ -48,6 +48,7 @@ namespace sirEdit::data {
 		private:
 			View staticView;
 			std::shared_ptr<void> data;
+			std::vector<std::function<void()>> change_callback;
 
 		public:
 			HistoricalView(View view);
@@ -55,6 +56,10 @@ namespace sirEdit::data {
 
 			const View& getStaticView() const {
 				return this->staticView;
+			}
+
+			void addChangeCallback(std::function<void()> func) {
+				this->change_callback.push_back(std::move(func));
 			}
 
 			void addTool(Tool tool);

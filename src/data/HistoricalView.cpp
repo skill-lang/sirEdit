@@ -19,8 +19,15 @@ sirEdit::data::HistoricalView::~HistoricalView() {
 	// TODO: Check that thread stopped and all is safed
 }
 
+template<class T>
+inline void updateCall(T& list) {
+	for(auto& i : list)
+		i();
+}
+
 void sirEdit::data::HistoricalView::addTool(Tool tool) {
 	this->staticView = this->staticView.addTool(tool);
+	updateCall(this->change_callback);
 }
 void sirEdit::data::HistoricalView::setFieldStatus(const Tool& tool, const Type& type, const Field& field, FIELD_STATE state, const std::function<void(const Type&, const Field&, FIELD_STATE, FIELD_STATE)>& callback_field, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
 	// Set state
@@ -40,6 +47,7 @@ void sirEdit::data::HistoricalView::setFieldStatus(const Tool& tool, const Type&
 			tmp_type = getSuper(*tmp_type);
 		}
 	}
+	updateCall(this->change_callback);
 }
 
 inline void updateSubtypes(const Tool& tool, const Type& type, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
@@ -72,4 +80,5 @@ void sirEdit::data::HistoricalView::setTypeStatus(const Tool& tool, const Type& 
 		// Update sub classes
 		updateSubtypes(tool, type, callback_type);
 	}
+	updateCall(this->change_callback);
 }
