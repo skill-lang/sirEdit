@@ -61,7 +61,7 @@ static FieldModel fieldModel;
 
 class Overview : public Gtk::VBox {
 	private:
-		HistoricalView& view;
+		Transactions& transactions;
 
 		// Stack
 		Gtk::Stack stack;
@@ -180,20 +180,20 @@ class Overview : public Gtk::VBox {
 		void updateToolData() {
 			this->tool_view.get_selection()->unselect_all();
 			this->tool_store->clear();
-			for(auto& i : this->view.getStaticView().getTools()) {
+			for(auto& i : this->transactions.getData().getTools()) {
 				// Checks
-				if(this->hide_unused_tool.property_active().get_value() && this->__cache_used_tools.find(&i) == this->__cache_used_tools.end())
+				if(this->hide_unused_tool.property_active().get_value() && this->__cache_used_tools.find(i) == this->__cache_used_tools.end())
 					continue;
-				if(this->hide_inactive_tool.property_active().get_value() && !this->isToolActive(&i))
+				if(this->hide_inactive_tool.property_active().get_value() && !this->isToolActive(i))
 					continue;
 
 				// Insert
 				auto tmp = *(this->tool_store->append());
-				tmp[toolModel.data_name] = i.getName();
-				tmp[toolModel.data_active] = this->isToolActive(&i);
-				tmp[toolModel.data_used] = this->__cache_used_tools.find(&i) != this->__cache_used_tools.end();
-				tmp[toolModel.data_tool] = const_cast<Tool*>(&i);
-				if(this->__cache_selected_tools.find(&i) != this->__cache_selected_tools.end())
+				tmp[toolModel.data_name] = i->getName();
+				tmp[toolModel.data_active] = this->isToolActive(i);
+				tmp[toolModel.data_used] = this->__cache_used_tools.find(i) != this->__cache_used_tools.end();
+				tmp[toolModel.data_tool] = const_cast<Tool*>(i);
+				if(this->__cache_selected_tools.find(i) != this->__cache_selected_tools.end())
 					this->tool_view.get_selection()->select(tmp);
 			}
 		}
@@ -242,7 +242,7 @@ class Overview : public Gtk::VBox {
 			{
 				Gtk::TreeStore::Row tmp;
 				std::list<Gtk::TreeStore::Path> toSelect;
-				for(auto& i : this->view.getStaticView().getBaseTypes())
+				for(auto& i : this->transactions.getData().getBaseTypes())
 					this->__genTypeItem<true>(*(this->type_store.get()), tmp, i, toSelect);
 				this->type_view.expand_all();
 				for(auto& i : toSelect)
@@ -331,7 +331,7 @@ class Overview : public Gtk::VBox {
 		}
 
 	public:
-		Overview(HistoricalView& view) : Gtk::VBox(), view(view) {
+		Overview(Transactions& transactions) : Gtk::VBox(), transactions(transactions) {
 			// Init Stack
 			this->stack_switcher.set_stack(this->stack);
 			this->pack_start(this->stack_switcher, false, true);
@@ -411,14 +411,14 @@ class Overview : public Gtk::VBox {
 			this->update_all();
 
 			// Change notification
-			this->view.addChangeCallback([this]() -> void {
+			this->transactions.addChangeCallback([this]() -> void {
 				this->update_all();
 			});
 		}
 };
 
 namespace sirEdit::gui {
-	Gtk::Widget* createOverview(HistoricalView& historicalView) {
-		return new Overview(historicalView);
+	Gtk::Widget* createOverview(Transactions& transactions) {
+		return new Overview(transactions);
 	}
 }

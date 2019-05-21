@@ -16,7 +16,6 @@ using namespace std;
 
 namespace sirEdit {
 	Gtk::Application* mainApplication;
-	sirEdit::data::HistoricalView* views = nullptr;
 	static Glib::Dispatcher* dispatcher;
 	static list<std::function<void()>> dispatcher_funcs;
 	static mutex dispatcher_mutex;
@@ -65,8 +64,6 @@ int main(int args, char** argv) {
 		sirEdit::gui::runStartupWindow();
 	});
 	auto reuslt = application->run(args, argv);
-	if(sirEdit::views != nullptr)
-		delete sirEdit::views;
 	return reuslt;
 
 	// GTK startup

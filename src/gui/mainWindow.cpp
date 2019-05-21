@@ -29,9 +29,9 @@ class MainWindow {
 	private:
 		Glib::RefPtr<Gtk::Builder> __builder;
 
-		shared_ptr<Serializer> __serializer;
+		unique_ptr<Serializer> __serializer;
 		Glib::RefPtr<Gio::File> __file;
-		HistoricalView __historicalView;
+		Transactions __transitions;
 
 		unordered_map<string, int> __tabs;
 		Gtk::Notebook* __notebook;
@@ -53,7 +53,7 @@ class MainWindow {
 			labelBox->pack_start(*label);
 			labelBox->pack_end(*closeButon);
 			labelBox->show_all();
-			Gtk::Widget* content = createToolEdit(tool.getName(), this->__historicalView);
+			Gtk::Widget* content = createToolEdit(tool.getName(), this->__transitions);
 			auto tmp = this->__notebook->append_page(*content, *labelBox);
 			this->__tabs[tool.getName()] = tmp;
 			this->__notebook->set_current_page(tmp);
@@ -74,7 +74,7 @@ class MainWindow {
 
 			// Rebuild list
 			{
-				sirEdit::data::View view = this->__historicalView.getStaticView();
+				const sirEdit::data::Serializer& view = this->__transitions.getData();
 				auto& tools = view.getTools();
 				size_t pos = 0;
 				for(auto& i : tools) {
@@ -82,7 +82,7 @@ class MainWindow {
 					{
 						Gtk::HBox* top = Gtk::manage(new Gtk::HBox());
 						{
-							Gtk::Label* tmp = Gtk::manage(new Gtk::Label(i.getName()));
+							Gtk::Label* tmp = Gtk::manage(new Gtk::Label(i->getName()));
 							tmp->set_alignment(Gtk::ALIGN_START, Gtk::ALIGN_CENTER);
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->set_image(*tmp);
@@ -90,10 +90,10 @@ class MainWindow {
 							top->pack_start(*(button), true, true);
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->signal_clicked().connect([&i, this]() -> void {
-								if(this->__tabs.find(i.getName()) == this->__tabs.end())
-									this->__create_tab(const_cast<Tool&>(i));
+								if(this->__tabs.find(i->getName()) == this->__tabs.end())
+									this->__create_tab(*const_cast<Tool*>(i));
 								else
-									this->__notebook->set_current_page(this->__tabs[i.getName()]);
+									this->__notebook->set_current_page(this->__tabs[i->getName()]);
 								this->__toolsPopover->hide();
 							});
 						}
@@ -118,7 +118,7 @@ class MainWindow {
 						main->pack_start(*top, true, true);
 					}
 					{
-						Gtk::Label* description = Gtk::manage(new Gtk::Label(i.getDescription()));
+						Gtk::Label* description = Gtk::manage(new Gtk::Label(i->getDescription()));
 						description->set_line_wrap_mode(Pango::WrapMode::WRAP_CHAR);
 						description->set_alignment(Gtk::ALIGN_START, Gtk::ALIGN_CENTER);
 						description->set_lines(1);
@@ -135,12 +135,12 @@ class MainWindow {
 		}
 
 	public:
-		MainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __historicalView(serializer->getView()) {
+		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
 			// Builder
 			this->__builder = Gtk::Builder::create_from_file("data/gui/mainWindow.glade");
 
 			// Gen historical view
-			this->__serializer = serializer;
+			this->__serializer = std::move(serializer);
 			this->__file = file;
 
 			// Notebook
@@ -200,8 +200,8 @@ class MainWindow {
 							return;
 						}
 
-						for(auto i : this->__historicalView.getStaticView().getTools())
-							if(i.getName() == text) {
+						for(auto i : this->__transitions.getData().getTools())
+							if(i->getName() == text) {
 								toolFinish->set_sensitive(false);
 								return;
 							}
@@ -215,13 +215,13 @@ class MainWindow {
 				// Dialog finished
 				toolFinish->signal_clicked().connect([this, newToolDialog, toolName, toolDescription, toolCommand]() -> void {
 					newToolDialog->hide();
-					this->__historicalView.addTool({toolName->get_text(), toolDescription->get_buffer()->get_text(), toolCommand->get_buffer()->get_text()});
+					this->__transitions.addTool({toolName->get_text(), toolDescription->get_buffer()->get_text(), toolCommand->get_buffer()->get_text()});
 					// TODO: Open new tool view
 				});
 			}
 
 			{
-				this->__notebook->append_page(*(Gtk::manage(createOverview(this->__historicalView))), "Overview");
+				this->__notebook->append_page(*(Gtk::manage(createOverview(this->__transitions))), "Overview");
 			}
 
 			// TODO: Remove prototype
@@ -387,6 +387,6 @@ class MainWindow {
 
 static shared_ptr<MainWindow> mainWindow;
 
-extern void sirEdit::gui::openMainWindow(shared_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
-	mainWindow = move(make_shared<MainWindow>(serializer, file));
+extern void sirEdit::gui::openMainWindow(std::unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
+	mainWindow = move(make_shared<MainWindow>(std::move(serializer), file));
 }

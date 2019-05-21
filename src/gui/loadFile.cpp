@@ -1,11 +1,14 @@
 #include <cstdio>
 #include <fstream>
+#include <atomic>
 #include <future>
 #include <iostream>
 #include <sirEdit/main.hpp>
 #include <sirEdit/data/serialize.hpp>
 
 #include "mainWindow.hpp"
+
+#include <iostream>
 
 using namespace std;
 
@@ -33,12 +36,17 @@ inline void loadFileThread(Gtk::Window* mainWindow, Gtk::Window* popup, Glib::Re
 	}
 
 	// Open file
-	auto serializer = sirEdit::data::Serializer::openFile(fileName);
+	std::unique_ptr<sirEdit::data::Serializer> serializer = std::move(sirEdit::data::getSir(fileName));
+	std::mutex mutex;
+	std::condition_variable cv;
+	std::unique_lock<std::mutex> lock(mutex);
 
 	// Send update
-	sirEdit::runInGui([mainWindow, popup, serializer, file]() -> void {
+	sirEdit::runInGui([mainWindow, popup, &serializer, file, &cv, &mutex]() -> void {
 		// Open windows
-		sirEdit::gui::openMainWindow(serializer, file);
+		std::unique_lock<std::mutex> lock(mutex);
+		sirEdit::gui::openMainWindow(std::move(static_cast<std::unique_ptr<sirEdit::data::Serializer>&>(serializer)), file);
+		cv.notify_one();
 
 		// Close windows
 		if(popup)
@@ -48,6 +56,7 @@ inline void loadFileThread(Gtk::Window* mainWindow, Gtk::Window* popup, Glib::Re
 			mainWindow->close();
 		}
 	});
+	cv.wait(lock);
 }
 
 extern void sirEdit::loadFile(Gtk::Window* window, Gtk::FileChooserNative* chooser) {

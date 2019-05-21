@@ -8,44 +8,6 @@
 #include <iostream>
 
 namespace sirEdit::utils {
-	template<class SOURCE>
-	inline std::string _getName(SOURCE* type) {
-		std::string result;
-		for(int i = 0; i < type->getName()->getParts()->size(); i++)
-			result += type->getName()->getParts()->get(i).string->c_str();
-		return result;
-	}
-
-	template<class SOURCE>
-	inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source) {
-		if(source == nullptr)
-			throw std::invalid_argument("Source is null pointer");
-		std::vector<sirEdit::data::Field> fields;
-		fields.resize(source->getFields()->size());
-		size_t counter = 0;
-		for(sir::FieldLike* i : *(source->getFields())) {
-			fields[counter] = std::move(sirEdit::data::Field(_getName(i), "", "")); // TODO: Add comments and type
-			counter++;
-		}
-		return std::move(std::make_unique<sirEdit::data::TypeWithFields>(_getName(source), "", fields)); // TODO: Add comments
-	}
-	inline std::shared_ptr<sirEdit::data::Type> genBaseType(sir::UserdefinedType* uf) {
-		std::string skillType = uf->skillName();
-		std::shared_ptr<sirEdit::data::Type> result;
-		if(skillType == sir::ClassType::typeName) {
-			std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(uf)));
-			result = std::move(std::make_shared<sirEdit::data::TypeClass>(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr));
-		}
-		else if(skillType == sir::InterfaceType::typeName) {
-			std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(uf)));
-			result = std::make_shared<sirEdit::data::TypeInterface>(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
-			std::cout << "Test: " << sirEdit::data::getSuper(*result.get()) << std::endl;
-		}
-		else
-			throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
-		return result;
-	}
-
 	template<class TARGET, class SOURCE>
 	inline void _addInterfaces(TARGET* target, SOURCE* source, std::unordered_map<sir::UserdefinedType*, sirEdit::data::Type*>& types) {
 		size_t counter = 0;
