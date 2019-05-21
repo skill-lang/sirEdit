@@ -15,7 +15,7 @@ using namespace std;
 class TypeListModel : public Gtk::TreeModel::ColumnRecord
 {
 	public:
-		Gtk::TreeModelColumn<size_t> data_id;
+		Gtk::TreeModelColumn<Type*> data_id;
 		Gtk::TreeModelColumn<Glib::ustring> data_name;
 		Gtk::TreeModelColumn<bool> data_status_r;
 		Gtk::TreeModelColumn<bool> data_status_r_transitive;
@@ -172,7 +172,7 @@ class Tab : public Gtk::HPaned
 		void buildTreeSubRows(Gtk::TreeStore::Row& row, const Type& super) {
 			for(auto& i : super.getSubTypes()) {
 				Gtk::TreeStore::Row tmp = *(typeListData->append(row.children()));
-				tmp[typeListModel.data_id] = i->getID();
+				tmp[typeListModel.data_id] = i;
 				tmp[typeListModel.data_name] = i->getName();
 				this->typeUpdate(tmp, this->tool.getTypeTransitiveState(*i), this->tool.getTypeSetState(*i));
 				type_lookup[i] = tmp;
@@ -224,9 +224,7 @@ class Tab : public Gtk::HPaned
 			if(iter) {
 				// Find type
 				Gtk::TreeModel::Row row = *iter;
-				if(this->transactions.getData().getTypes().size() <= row[typeListModel.data_id])
-					throw; // That should NEVER happen!
-				const sirEdit::data::Type* type = this->transactions.getData().getTypes()[row[typeListModel.data_id]];
+				const sirEdit::data::Type* type = row[typeListModel.data_id];
 				this->currentType = const_cast<Type*>(type);
 
 				// Generate list
@@ -244,7 +242,7 @@ class Tab : public Gtk::HPaned
 			if(iter) {
 				// Find type
 				Gtk::TreeModel::Row row = *iter;
-				const sirEdit::data::Type* type = this->transactions.getData().getTypes().at(row[typeListModel.data_id]);
+				const sirEdit::data::Type* type = row[typeListModel.data_id];
 
 				// Update row
 				this->transactions.setTypeStatus(this->tool, *const_cast<Type*>(type), state, [this](const Type& type, TYPE_STATE transitive, TYPE_STATE set) -> void {
@@ -293,7 +291,7 @@ class Tab : public Gtk::HPaned
 				{
 					for(auto& i : transactions.getData().getBaseTypes()) {
 						Gtk::TreeStore::Row tmp = *(typeListData->append());
-						tmp[typeListModel.data_id] = i->getID();
+						tmp[typeListModel.data_id] = i;
 						tmp[typeListModel.data_name] = i->getName();
 						this->buildTreeSubRows(tmp, *i);
 						this->type_lookup[i] = tmp;
