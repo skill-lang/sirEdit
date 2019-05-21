@@ -47,13 +47,13 @@ class FieldModel : public Gtk::TreeModel::ColumnRecord
 		Gtk::TreeModelColumn<Glib::ustring> data_name;
 		Gtk::TreeModelColumn<bool> data_used;
 		Gtk::TreeModelColumn<bool> data_active;
-		Gtk::TreeModelColumn<Field*> data_type;
+		Gtk::TreeModelColumn<Field*> data_field;
 
 		FieldModel() {
 			this->add(data_used);
 			this->add(data_active);
 			this->add(data_name);
-			this->add(data_type);
+			this->add(data_field);
 		}
 };
 static FieldModel fieldModel;
@@ -96,8 +96,26 @@ class Overview : public Gtk::VBox {
 		std::unordered_set<const Type*> __cache_selected_type;
 		std::unordered_set<const Tool*> __cache_selected_tools;
 		std::unordered_set<const Tool*> __cache_used_tools;
+		std::unordered_set<const Field*> __cache_used_field;
+		std::unordered_set<const Field*> __cache_selected_fields;
 		const Type* __current_type;
 
+		std::unordered_set<const Type*> getActiveTypes() {
+			std::unordered_set<const Type*> result;
+			for(auto& i : this->type_view.get_selection()->get_selected_rows()) {
+				const Type* tmp = (*(this->type_store->get_iter(i)))[typeModel.data_type];
+				result.insert(tmp);
+			}
+			return std::move(result);
+		}
+		std::unordered_set<const Field*> getActiveFields() {
+			std::unordered_set<const Field*> result;
+			for(auto& i : this->field_view.get_selection()->get_selected_rows()) {
+				const Field* tmp = (*(this->field_store->get_iter(i)))[fieldModel.data_field];
+				result.insert(tmp);
+			}
+			return std::move(result);
+		}
 		void genCacheTools() {
 			this->__cache_selected_tools = {};
 			for(auto& i : this->tool_view.get_selection()->get_selected_rows()) {
@@ -106,11 +124,10 @@ class Overview : public Gtk::VBox {
 			}
 		}
 		void genCacheTypes() {
-			this->__cache_selected_type = {};
-			for(auto& i : this->type_view.get_selection()->get_selected_rows()) {
-				const Type* tmp = (*(this->type_store->get_iter(i)))[typeModel.data_type];
-				this->__cache_selected_type.insert(tmp);
-			}
+			this->__cache_selected_type = std::move(this->getActiveTypes());
+		}
+		void genCacheFields() {
+			this->__cache_selected_fields = std::move(this->getActiveFields());
 		}
 
 		//
@@ -144,7 +161,25 @@ class Overview : public Gtk::VBox {
 				if(!found)
 					return false;
 			}
-			// TODO: Check field marked
+
+			// Check field
+			if(this->__cache_selected_fields.size() != 0) {
+				bool found = false;
+				for(auto& i : this->__cache_selected_fields) {
+					auto tmp = tool->getStatesFields().find(i);
+					if(tmp != tool->getStatesFields().end()) {
+						for(auto& j : tmp->second)
+							if(j.second >= FIELD_STATE::READ) {
+								found = true;
+								break;
+							}
+						if(found)
+							break;
+					}
+				}
+				if(!found)
+					return false;
+			}
 			return true;
 		}
 		bool isTypeActive(const Type* type) {
@@ -173,7 +208,22 @@ class Overview : public Gtk::VBox {
 				if(!found)
 					return false;
 			}
-			// TODO: Check fields
+
+			// Check field
+			if(this->__cache_selected_fields.size() != 0) {
+				bool found = false;
+				for(auto& i : this->__cache_selected_fields) {
+					for(auto& j : this->transactions.getData().getTools())
+						if(j->getFieldSetState(*i, *type) >= FIELD_STATE::READ) {
+							found = true;
+							break;
+						}
+					if(found)
+						break;
+				}
+				if(!found)
+					return false;
+			}
 			return true;
 		}
 
@@ -313,7 +363,17 @@ class Overview : public Gtk::VBox {
 			this->update_all();
 		}
 		void toggle_field_used(const Glib::ustring& index) {
-			// TODO: Toogle used
+			auto tmp = *(this->field_store->get_iter(index));
+			auto tmpIter = this->__cache_used_field.find(static_cast<const Field*>(tmp[fieldModel.data_field]));
+			if(tmpIter == this->__cache_used_field.end()) {
+				this->__cache_used_field.insert(static_cast<const Field*>(tmp[fieldModel.data_field]));
+				tmp[fieldModel.data_used] = true;
+			}
+			else {
+				this->__cache_used_field.erase(tmpIter);
+				tmp[fieldModel.data_used] = false;
+			}
+			this->update_all();
 		}
 
 		void update_all() {
@@ -321,8 +381,33 @@ class Overview : public Gtk::VBox {
 				return;
 			blockChange = true;
 
+			// Get last selected
+			{
+				std::unordered_set<const Type*> tmp = std::move(this->getActiveTypes());
+				bool found = false;
+				const Type* foundType = nullptr;
+				for(auto& i : tmp) {
+					auto tmp2 = this->__cache_selected_type.find(i);
+					if(tmp2 == this->__cache_selected_type.end()) {
+						if(found) {
+							found = false;
+							break;
+						}
+						else {
+							found = true;
+							foundType = *i;
+						}
+					}
+				}
+				if(found)
+					this->__current_type = foundType;
+				this->__cache_selected_type = std::move(tmp);
+			}
+
+			// Update views
 			this->genCacheTools();
-			this->genCacheTypes();
+			//this->genCacheTypes();
+			this->genCacheFields();
 			this->updateToolData();
 			this->updateTypeData();
 			this->updateFieldData();
@@ -398,13 +483,25 @@ class Overview : public Gtk::VBox {
 				this->toggle_type_used(index);
 			});
 			this->type_view.get_selection()->signal_changed().connect([this]() -> void {
+				//if(!this->blockChange) {
+				//	auto tmp = this->type_view.get_selection()->get_selected_rows();
+				//	if(tmp.size() > 0)
+				//		this->changeCorrentType((*(this->type_store->get_iter(tmp[tmp.size() - 1])))[typeModel.data_type]);
+				//}
 				this->update_all();
 			});
+			//this->type_view.set_activate_on_single_click(true);
+			//this->type_view.signal_row_activated().connect([this](const Gtk::TreeModel::Path& path, Gtk::TreeViewColumn* column) -> void {
+			//	this->changeCorrentType((*(this->type_store->get_iter(path)))[typeModel.data_type]);
+			//});
 
 			this->field_store = Gtk::TreeStore::create(fieldModel);
 			this->field_view.set_model(this->field_store);
 			genTreeView(this->field_view, fieldModel, [this](Glib::ustring index) -> void {
 				this->toggle_field_used(index);
+			});
+			this->field_view.get_selection()->signal_changed().connect([this]() -> void {
+				this->update_all();
 			});
 
 			// Content
