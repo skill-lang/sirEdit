@@ -48,12 +48,14 @@ class FieldModel : public Gtk::TreeModel::ColumnRecord
 		Gtk::TreeModelColumn<bool> data_used;
 		Gtk::TreeModelColumn<bool> data_active;
 		Gtk::TreeModelColumn<Field*> data_field;
+		Gtk::TreeModelColumn<bool> data_isUsable;
 
 		FieldModel() {
 			this->add(data_used);
 			this->add(data_active);
 			this->add(data_name);
 			this->add(data_field);
+			this->add(data_isUsable);
 		}
 };
 static FieldModel fieldModel;
@@ -98,7 +100,7 @@ class Overview : public Gtk::VBox {
 		std::unordered_set<const Tool*> __cache_used_tools;
 		std::unordered_set<const Field*> __cache_used_field;
 		std::unordered_set<const Field*> __cache_selected_fields;
-		const Type* __current_type;
+		const Type* __current_type = nullptr;
 
 		std::unordered_set<const Type*> getActiveTypes() {
 			std::unordered_set<const Type*> result;
@@ -307,21 +309,77 @@ class Overview : public Gtk::VBox {
 			});
 		}
 
-		void __genFieldData() {
+		Gtk::TreeStore::Path __genFieldData(const Type* type, bool required) {
+			// Find local fields to show
+			std::list<const Field*> fields;
+			doBaseType(type, []() -> void {}, [&fields, type]() -> void {
+				for(auto& i : dynamic_cast<const TypeInterface*>(type)->getFields())
+					fields.push_back(&i);
+			}, [&fields, type]() -> void {
+				for(auto& i : dynamic_cast<const TypeClass*>(type)->getFields()) {
+					fields.push_back(&i);
+				}
+			});
 
+			// Generate class iter
+			const Type* parent = getSuper(*type);
+			Gtk::TreeStore::iterator classIter;
+			if(parent != nullptr) {
+				Gtk::TreeStore::Path parentPath = this->__genFieldData(parent, required | fields.size() > 0);
+				if(!required & fields.size() == 0)
+					return {};
+				classIter = this->field_store->append(this->field_store->get_iter(parentPath)->children());
+			}
+			else {
+				if(!required & fields.size() == 0)
+					return {};
+				classIter = this->field_store->append();
+			}
+
+			// Set class info
+			{
+				auto tmp = *classIter;
+				tmp[fieldModel.data_isUsable] = false;
+				tmp[fieldModel.data_active] = false;
+				tmp[fieldModel.data_used] = false;
+				tmp[fieldModel.data_field] = nullptr;
+				tmp[fieldModel.data_name] = type->getName();
+			}
+
+			// Show data
+			for(auto& i : fields) {
+				auto tmp = *(this->field_store->append(classIter->children()));
+				tmp[fieldModel.data_active] = false; // TODO: Set active
+				tmp[fieldModel.data_isUsable] = true;
+				tmp[fieldModel.data_field] = const_cast<Field*>(i);
+				tmp[fieldModel.data_name] = i->getName();
+				tmp[fieldModel.data_used] = this->__cache_used_field.find(i) != this->__cache_used_field.end();
+			}
+
+			return this->field_store->get_path(classIter);
 		}
 		void updateFieldData() {
+			// TODO: Scrolling
+			// TODO: Keep selection
+			// TODO: Check filter
+			this->field_view.get_selection()->unselect_all();
+			this->field_store->clear();
+			if(this->__current_type != nullptr)
+				this->__genFieldData(this->__current_type, false);
+			this->field_view.expand_all();
 		}
 
 		//
 		// Generators
 		//
-		template<class MODEL, class TOGGLE_CALLBACK>
+		template<bool USED_CHECK = false, class MODEL, class TOGGLE_CALLBACK>
 		static void genTreeView(Gtk::TreeView& tree_view, MODEL& tree_model, const TOGGLE_CALLBACK& toggle_callback) {
 			auto tmp_used = Gtk::manage(new Gtk::CellRendererToggle());
 			tree_view.append_column("used", *tmp_used);
 			tree_view.get_column(0)->add_attribute(tmp_used->property_active(), tree_model.data_used);
 			tmp_used->signal_toggled().connect(toggle_callback);
+			if constexpr(USED_CHECK)
+				tree_view.get_column(0)->add_attribute(tmp_used->property_activatable(), tree_model.data_isUsable);
 			auto tmp_active = Gtk::manage(new Gtk::CellRendererToggle());
 			tmp_active->set_activatable(false);
 			tree_view.append_column("active", *tmp_active);
@@ -457,7 +515,13 @@ class Overview : public Gtk::VBox {
 			{
 				Gtk::VBox* tmp = Gtk::manage(new Gtk::VBox());
 				tmp->pack_start(this->hide_inactive_field, false, true);
+				this->hide_inactive_field.signal_toggled().connect([this]() -> void {
+					this->update_all();
+				});
 				tmp->pack_start(this->hide_unused_field, false, true);
+				this->hide_unused_field.signal_toggled().connect([this]() -> void {
+					this->update_all();
+				});
 				this->field_scroll.add(this->field_view);
 				tmp->pack_start(this->field_scroll, true, true);
 				this->field_paned.pack1(*tmp);
@@ -497,7 +561,7 @@ class Overview : public Gtk::VBox {
 
 			this->field_store = Gtk::TreeStore::create(fieldModel);
 			this->field_view.set_model(this->field_store);
-			genTreeView(this->field_view, fieldModel, [this](Glib::ustring index) -> void {
+			genTreeView<true>(this->field_view, fieldModel, [this](Glib::ustring index) -> void {
 				this->toggle_field_used(index);
 			});
 			this->field_view.get_selection()->signal_changed().connect([this]() -> void {
