@@ -3,7 +3,7 @@
 #include <gtkmm.h>
 #include <unordered_set>
 
-#include <iostream>
+#include <sirEdit/main.hpp>
 
 using namespace sirEdit::data;
 
@@ -79,10 +79,13 @@ class Overview : public Gtk::VBox {
 		Gtk::ToggleButton hide_inactive_field = Gtk::ToggleButton("Hide inactive");
 		Gtk::ToggleButton hide_unused_field = Gtk::ToggleButton("Hide unused");
 
+		Gtk::ScrolledWindow tool_scroll;
 		Gtk::TreeView tool_view;
 		Glib::RefPtr<Gtk::TreeStore> tool_store;
+		Gtk::ScrolledWindow type_scroll;
 		Gtk::TreeView type_view;
 		Glib::RefPtr<Gtk::TreeStore> type_store;
+		Gtk::ScrolledWindow field_scroll;
 		Gtk::TreeView field_view;
 		Glib::RefPtr<Gtk::TreeStore> field_store;
 
@@ -93,7 +96,7 @@ class Overview : public Gtk::VBox {
 		std::unordered_set<const Type*> __cache_selected_type;
 		std::unordered_set<const Tool*> __cache_selected_tools;
 		std::unordered_set<const Tool*> __cache_used_tools;
-		const Tool* __current_tool;
+		const Type* __current_type;
 
 		void genCacheTools() {
 			this->__cache_selected_tools = {};
@@ -196,45 +199,62 @@ class Overview : public Gtk::VBox {
 		}
 
 		template<bool FIRST>
-		void __genTypeItem(Gtk::TreeStore& tree, Gtk::TreeStore::Row& row, const Type* type) {
+		void __genTypeItem(Gtk::TreeStore& tree, Gtk::TreeStore::Row& row, const Type* type, std::list<Gtk::TreeStore::Path>& toSelect) {
 			// Checks
 			if(this->hide_unused_type.property_active().get_value() && this->__cache_used_type.find(type) == this->__cache_used_type.end()) {
 				for(auto& i : type->getSubTypes())
-					this->__genTypeItem<FIRST>(tree, row, i);
+					this->__genTypeItem<FIRST>(tree, row, i, toSelect);
 				return;
 			}
 			if(this->hide_inactive_type.property_active().get_value() && !this->isTypeActive(type)) {
 				for(auto& i : type->getSubTypes())
-					this->__genTypeItem<FIRST>(tree, row, i);
+					this->__genTypeItem<FIRST>(tree, row, i, toSelect);
 				return;
 			}
 
 			// Insert
 			Gtk::TreeStore::Row own;
 			Gtk::TreeStore::iterator ownIter;
-			if constexpr(FIRST)
-				ownIter = tree.append();
-			else
-				ownIter = tree.append(row.children());
+			{
+				if constexpr(FIRST)
+					ownIter = tree.append();
+				else
+					ownIter = tree.append(row.children());
+			}
 			own = *ownIter;
 			own[typeModel.data_name] = type->getName();
 			own[typeModel.data_active] = this->isTypeActive(type);
 			own[typeModel.data_used] = this->__cache_used_type.find(type) != this->__cache_used_type.end();
 			own[typeModel.data_type] = const_cast<Type*>(type);
 			if(this->__cache_selected_type.find(type) != this->__cache_selected_type.end())
-				this->type_view.get_selection()->select(ownIter);
+				toSelect.push_back(this->type_store->get_path(ownIter));
 			for(auto& i : type->getSubTypes())
-				this->__genTypeItem<false>(tree, own, i);
+				this->__genTypeItem<false>(tree, own, i, toSelect);
 		}
 		void updateTypeData() {
+			// Get scroll bar
+			double x = this->type_scroll.get_hadjustment()->get_value();
+			double y = this->type_scroll.get_vadjustment()->get_value();
+
+			// Update entries
 			this->type_view.get_selection()->unselect_all();
-			this->type_store->clear();
+			this->type_store->clear(); // TODO: Just clear when required.
 			{
 				Gtk::TreeStore::Row tmp;
+				std::list<Gtk::TreeStore::Path> toSelect;
 				for(auto& i : this->view.getStaticView().getBaseTypes())
-					this->__genTypeItem<false>(*(this->type_store.get()), tmp, i);
+					this->__genTypeItem<true>(*(this->type_store.get()), tmp, i, toSelect);
 				this->type_view.expand_all();
+				for(auto& i : toSelect)
+					this->type_view.get_selection()->select(i);
 			}
+
+			// Set scroll bar
+			this->type_scroll.queue_draw();
+			sirEdit::runInGui([this, x, y]() -> void {
+				this->type_scroll.get_hadjustment()->set_value(x);
+				this->type_scroll.get_vadjustment()->set_value(y);
+			});
 		}
 
 		void __genFieldData() {
@@ -330,9 +350,8 @@ class Overview : public Gtk::VBox {
 				this->hide_unused_tool.signal_toggled().connect([this]() -> void {
 					this->update_all();
 				});
-				Gtk::ScrolledWindow* tmp2 = Gtk::manage(new Gtk::ScrolledWindow());
-				tmp2->add(this->tool_view);
-				tmp->pack_start(*tmp2, true, true);
+				this->tool_scroll.add(this->tool_view);
+				tmp->pack_start(this->tool_scroll, true, true);
 				this->tool_paned.pack1(*tmp);
 			}
 			this->type_paned.pack2(this->field_paned);
@@ -346,18 +365,16 @@ class Overview : public Gtk::VBox {
 				this->hide_unused_type.signal_toggled().connect([this]() -> void {
 					this->update_all();
 				});
-				Gtk::ScrolledWindow* tmp2 = Gtk::manage(new Gtk::ScrolledWindow());
-				tmp2->add(this->type_view);
-				tmp->pack_start(*tmp2, true, true);
+				this->type_scroll.add(this->type_view);
+				tmp->pack_start(this->type_scroll, true, true);
 				this->type_paned.pack1(*tmp);
 			}
 			{
 				Gtk::VBox* tmp = Gtk::manage(new Gtk::VBox());
 				tmp->pack_start(this->hide_inactive_field, false, true);
 				tmp->pack_start(this->hide_unused_field, false, true);
-				Gtk::ScrolledWindow* tmp2 = Gtk::manage(new Gtk::ScrolledWindow());
-				tmp2->add(this->field_view);
-				tmp->pack_start(*tmp2, true, true);
+				this->field_scroll.add(this->field_view);
+				tmp->pack_start(this->field_scroll, true, true);
 				this->field_paned.pack1(*tmp);
 			}
 			{
