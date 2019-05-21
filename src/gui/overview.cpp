@@ -228,6 +228,65 @@ class Overview : public Gtk::VBox {
 			}
 			return true;
 		}
+		bool isFieldActive(const Field* field) {
+			// Check tools
+			if(this->__cache_selected_tools.size() > 0) {
+				bool found = false;
+				for(auto& i : this->__cache_selected_tools) {
+					for(auto& j : i->getStatesFields()) { // TODO: Optimize
+						if(j.first == field)
+							for(auto& k : j.second)
+								if(k.second >= FIELD_STATE::READ) {
+									found = true;
+									break;
+								}
+						if(found)
+							break;
+					}
+					if(found)
+						break;
+				}
+				if(!found)
+					return false;
+			}
+
+			// Check types
+			if(this->__cache_selected_type.size() > 0) {
+				bool found = false;
+				for(auto& i : this->transactions.getData().getTools()) {
+					for(auto& j : i->getStatesFields()) { // TODO: Optimize
+						if(j.first == field)
+							for(auto& k : this->__cache_selected_type) {
+								auto tmp = j.second.find(k);
+								if(tmp != j.second.end())
+									if(tmp->second >= FIELD_STATE::READ) {
+										found = true;
+										break;
+									}
+							}
+						if(found)
+							break;
+					}
+					if(found)
+						break;
+				}
+				if(!found)
+					return false;
+			}
+
+			// Check fields
+			if(this->__cache_selected_fields.size() > 0) {
+				bool found = false;
+				for(auto& i : this->__cache_selected_fields)
+					if(i == field) {
+						found = true;
+						break;
+					}
+				if(!found)
+					return false;
+			}
+			return true;
+		}
 
 		void updateToolData() {
 			this->tool_view.get_selection()->unselect_all();
@@ -302,11 +361,8 @@ class Overview : public Gtk::VBox {
 			}
 
 			// Set scroll bar
-			this->type_scroll.queue_draw();
-			sirEdit::runInGui([this, x, y]() -> void {
-				this->type_scroll.get_hadjustment()->set_value(x);
-				this->type_scroll.get_vadjustment()->set_value(y);
-			});
+			this->type_scroll.get_hadjustment()->set_value(x);
+			this->type_scroll.get_vadjustment()->set_value(y);
 		}
 
 		Gtk::TreeStore::Path __genFieldData(const Type* type, bool required) {
@@ -349,7 +405,7 @@ class Overview : public Gtk::VBox {
 			// Show data
 			for(auto& i : fields) {
 				auto tmp = *(this->field_store->append(classIter->children()));
-				tmp[fieldModel.data_active] = false; // TODO: Set active
+				tmp[fieldModel.data_active] = this->isFieldActive(i);
 				tmp[fieldModel.data_isUsable] = true;
 				tmp[fieldModel.data_field] = const_cast<Field*>(i);
 				tmp[fieldModel.data_name] = i->getName();
