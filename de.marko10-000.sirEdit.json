@@ -1,0 +1,180 @@
+{
+	"app-id": "de.marko10_000.sirEdit",
+	"runtime": "org.gnome.Platform",
+	"runtime-version": "3.32",
+	"sdk": "org.gnome.Sdk",
+	"command": "/app/bin/sirEdit",
+	"writable-sdk": true,
+	"finish-args": [
+        "--require-version=1.0.0",
+        "--device=dri",
+        "--share=ipc",
+        "--socket=x11",
+        "--socket=wayland",
+        "--talk-name=org.gtk.vfs.*",
+        "--talk-name=org.gnome.SettingsDaemon.Color",
+	"--own-name=de.marko10-000.sirEdit"
+	],
+	"modules": [
+		{
+			"name": "update-meson",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://files.pythonhosted.org/packages/0b/93/ce7dc081e742d4b87e2d591e709f427992cdefdf0bac3f7638cb4f2bb14b/meson-0.51.0.tar.gz",
+					"sha256": "b9a59a2116836257d53b2b803337e797ab4d11da4a9dfbaa76544b0ec0894dd9"
+				}
+			],
+			"buildsystem": "simple",
+			"build-commands": [
+				"rm -v /usr/share/man /usr/share/doc",
+				"pip3 install ."
+			]
+		},
+		{
+			"name": "sigc++",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://github.com/libsigcplusplus/libsigcplusplus/releases/download/2.10.2/libsigc++-2.10.2.tar.xz",
+					"sha256": "b1ca0253379596f9c19f070c83d362b12dfd39c0a3ea1dd813e8e21c1a097a98"
+				}
+			],
+			"config-opts": [
+				"--enable-static",
+				"--disable-shared"
+			],
+			"cleanup": [
+				"*.a",
+				"*.la"
+			]
+		},
+		{
+			"name": "glibmm",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://ftp.gnome.org/pub/GNOME/sources/glibmm/2.60/glibmm-2.60.0.tar.xz",
+					"sha256": "a3a1b1c9805479a16c0018acd84b3bfff23a122aee9e3c5013bb81231aeef2bc"
+				}
+			],
+			"config-opts": [
+				"--enable-static",
+				"--disable-shared"
+			],
+			"cleanup": [
+				"*.a",
+				"*.la"
+			]
+		},
+		{
+			"name": "cairomm",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://ftp.gnome.org/pub/GNOME/sources/cairomm/1.12/cairomm-1.12.0.tar.xz",
+					"sha256": "a54ada8394a86182525c0762e6f50db6b9212a2109280d13ec6a0b29bfd1afe6"
+				}
+			],
+			"config-opts": [
+				"--enable-static",
+				"--disable-shared"
+			],
+			"cleanup": [
+				"*.a",
+				"*.la"
+			]
+		},
+		{
+			"name": "pangomm",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://ftp.gnome.org/pub/GNOME/sources/pangomm/2.42/pangomm-2.42.0.tar.xz",
+					"sha256": "ca6da067ff93a6445780c0b4b226eb84f484ab104b8391fb744a45cbc7edbf56"
+				}
+			],
+			"config-opts": [
+				"--enable-static",
+				"--disable-shared"
+			],
+			"cleanup": [
+				"*.a",
+				"*.la"
+			]
+		},
+		{
+			"name": "atkmm",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://ftp.gnome.org/pub/GNOME/sources/atkmm/2.28/atkmm-2.28.0.tar.xz",
+					"sha256": "4c4cfc917fd42d3879ce997b463428d6982affa0fb660cafcc0bc2d9afcedd3a"
+				}
+			],
+			"config-opts": [
+				"--enable-static",
+				"--disable-shared"
+			],
+			"cleanup": [
+				"*.a",
+				"*.la"
+			]
+		},
+		{
+			"name": "gtkmm",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://ftp.gnome.org/pub/GNOME/sources/gtkmm/3.24/gtkmm-3.24.1.tar.xz",
+					"sha256": "ddfe42ed2458a20a34de252854bcf4b52d3f0c671c045f56b42aa27c7542d2fd"
+				}
+			],
+			"config-opts": [
+				"--enable-static",
+				"--disable-shared"
+			],
+			"cleanup": [
+				"*.a",
+				"*.la"
+			]
+		},
+		{
+			"name": "java",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://download.java.net/java/GA/jdk11/9/GPL/openjdk-11.0.2_linux-x64_bin.tar.gz",
+					"sha256": "99be79935354f5c0df1ad293620ea36d13f48ec3ea870c838f20c504c9668b57"
+				}
+			],
+			"buildsystem": "simple",
+			"build-commands": [
+				"mkdir -p /app/jre",
+				"cp -rav * /app/jre",
+				"mkdir -p /app/bin",
+				"echo '# /usr/bin/env bash' >> /app/bin/java; echo 'exec /app/jre/bin/java $@' >> /app/bin/java",
+				"echo '# /usr/bin/env bash' >> /app/bin/javac; echo 'exec /app/jre/bin/javac $@' >> /app/bin/javac",
+				"chmod +x /app/bin/java /app/bin/javac"
+			]
+		},
+		{
+			"name": "sirEdit",
+			"buildsystem": "meson-ninja",
+			"sources": [
+				{
+					"type": "file",
+					"path": "."
+				},
+				{
+					"type": "shell",
+					"commands": [
+						"ln -s /app/lib/libgtkmm-3.0.a /usr/lib/libgtkmm-3.0.a",
+						"ls -la /usr/lib/libgtkmm-3.0.a"
+					]
+				}
+			]
+		}
+	]
+}
+

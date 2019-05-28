@@ -1,0 +1,21 @@
+# definition of tools and build properties for tools
+
+include "types.skill"
+
+Tool {
+  string name;
+  string description;
+  string command;
+
+  /**
+   * the map of user types selected by this tool.
+   * The string can get "u", "r", "w", "d".
+   */
+  map<UserdefinedType, string> selectedUserTypes;
+
+  /**
+   * The set of fields selected by this tool.
+   * The string can get "u", "r", "w", "c".
+   */
+  map<UserdefinedType, FieldLike, string> selectedFields;
+}

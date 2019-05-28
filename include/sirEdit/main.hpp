@@ -2,6 +2,7 @@
 #include <functional>
 #include <gtkmm.h>
 #include <sirEdit/data/serialize.hpp>
+#include <string>
 
 namespace sirEdit {
 	extern Gtk::Application* mainApplication;

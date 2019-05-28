@@ -2,6 +2,8 @@
 #include "mainWindow.hpp"
 #include <sirEdit/main.hpp>
 
+extern std::string sirEdit_mainWindow_glade;
+
 #include <list>
 #include <unordered_map>
 
@@ -137,7 +139,7 @@ class MainWindow {
 	public:
 		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
 			// Builder
-			this->__builder = Gtk::Builder::create_from_file("data/gui/mainWindow.glade");
+			this->__builder = Gtk::Builder::create_from_string(sirEdit_mainWindow_glade);
 
 			// Gen historical view
 			this->__serializer = std::move(serializer);

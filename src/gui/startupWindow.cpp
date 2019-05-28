@@ -1,6 +1,8 @@
 #include <gtkmm.h>
 #include <sirEdit/main.hpp>
 
+extern std::string sirEdit_startupWindow_glade;
+
 #include "startupWindow.hpp"
 
 // INFO: Hack to to protect crashes after main program
@@ -12,7 +14,7 @@ extern void sirEdit::gui::runStartupWindow() {
 
 	// Load file
 	if(!startUpBuild)
-		startUpBuild = Gtk::Builder::create_from_file("data/gui/startupWindow.glade");
+		startUpBuild = Gtk::Builder::create_from_string(sirEdit_startupWindow_glade);
 
 	// Window
 	Gtk::ApplicationWindow* window;
@@ -44,7 +46,7 @@ extern void sirEdit::gui::runStartupWindow() {
 		startUpBuild->get_widget("MultispecList", list);
 
 		auto tmp = new Gtk::HBox();
-		auto tmp_label = new Gtk::Label("/home/marko/Projekte/SkillEdit/sirEdit/skill.sir");
+		auto tmp_label = new Gtk::Label("skill.sir");
 		tmp_label->set_alignment(Gtk::Align::ALIGN_START, Gtk::Align::ALIGN_CENTER);
 		tmp->pack_start(*(tmp_label), true, true);
 		auto tmpButton = new Gtk::Button();
@@ -62,6 +64,25 @@ extern void sirEdit::gui::runStartupWindow() {
 	// TODO: Info
 
 	// TODO: Import skill file
+	{
+		Gtk::Button* button;
+		Gtk::Button* doImport;
+		Gtk::ApplicationWindow* window;
+		Gtk::FileChooserButton* importFile;
+		startUpBuild->get_widget("ImportSKILL", button);
+		startUpBuild->get_widget("doImport", doImport);
+		startUpBuild->get_widget("ImportSKilLWindow", window);
+		startUpBuild->get_widget("importFile", importFile);
+
+		// Activation button
+		button->signal_clicked().connect([window]() -> void {
+			window->show_all();
+		});
+
+		// Set properties
+		doImport->set_sensitive(false);
+		importFile->set_sensitive(false);
+	}
 
 	// Open sir file
 	{
