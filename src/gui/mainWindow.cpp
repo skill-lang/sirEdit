@@ -27,6 +27,59 @@ class TmpModel : public Gtk::TreeModel::ColumnRecord
 };
 //static TmpModel tmpModel;
 
+class EditTool : public Gtk::Popover {
+	private:
+		Gtk::VBox layer;
+		Gtk::Entry name;
+		Gtk::Entry description;
+		Gtk::Entry cmd;
+		Gtk::Button okaybutton;
+
+		Tool* tool;
+		Transactions& transactions;
+
+	public:
+		EditTool(Tool* tool, Transactions& transactions) : tool(tool), transactions(transactions) {
+			// Basic layout
+			this->okaybutton.set_label("gtk-apply");
+			this->add(this->layer);
+			this->layer.pack_start(this->name, true, false);
+			this->layer.pack_start(this->description, true, false);
+			this->layer.pack_start(this->cmd, true, false);
+			this->layer.pack_start(this->okaybutton, true, false);
+
+			// Set base config
+			this->name.set_placeholder_text("Name");
+			this->description.set_placeholder_text("Description");
+			this->cmd.set_placeholder_text("Command-Line");
+
+			// Set arguments
+			this->name.set_text(tool->getName());
+			this->description.set_text(tool->getCommand());
+			this->cmd.set_text(tool->getCommand());
+
+			// Signals
+			this->name.signal_changed().connect([this]() -> void {
+				string name = this->name.get_text();
+				if(name.empty()) {
+					this->okaybutton.set_sensitive(false);
+					return;
+				}
+				for(auto& i : this->transactions.getData().getTools()) {
+					if(i->getName() == name && name != this->tool->getName()) {
+						this->okaybutton.set_sensitive(false);
+						return;
+					}
+				}
+				this->okaybutton.set_sensitive(true);
+				return;
+			});
+			this->okaybutton.signal_clicked().connect([this]() -> void {
+				this->remove();
+			});
+		}
+};
+
 class MainWindow {
 	private:
 		Glib::RefPtr<Gtk::Builder> __builder;
@@ -139,7 +192,11 @@ class MainWindow {
 	public:
 		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
 			// Builder
-			this->__builder = Gtk::Builder::create_from_string(sirEdit_mainWindow_glade);
+			this->__builder = Gtk::Builder::create();
+			Gtk::Popover tmp;
+			this->__builder->expose_widget("EditTool", tmp);
+			if(!this->__builder->add_from_string(sirEdit_mainWindow_glade))
+				throw; // That should never happen
 
 			// Gen historical view
 			this->__serializer = std::move(serializer);
@@ -163,39 +220,35 @@ class MainWindow {
 			// New tool
 			{
 				Gtk::Button* newToolButton;
-				Gtk::Dialog* newToolDialog;
+				Gtk::Popover* newToolDialog;
 				Gtk::Entry* toolName;
+				Gtk::Entry* toolDescription;
+				Gtk::Entry* toolCommand;
 				Gtk::Button* toolFinish;
-				Gtk::Button* toolExit;
-				Gtk::TextView* toolDescription;
-				Gtk::TextView* toolCommand;
 				this->__builder->get_widget("ToolAddButton", newToolButton);
-				this->__builder->get_widget("NewToolDialog", newToolDialog);
-				this->__builder->get_widget("ToolName", toolName);
-				this->__builder->get_widget("ToolNewAdd", toolFinish);
-				this->__builder->get_widget("ToolNewExit", toolExit);
-				this->__builder->get_widget("ToolDescription", toolDescription);
-				this->__builder->get_widget("ToolCommand", toolCommand);
+				this->__builder->get_widget("AddToolDialog", newToolDialog);
+				this->__builder->get_widget("AddToolName", toolName);
+				this->__builder->get_widget("AddToolDescription", toolDescription);
+				this->__builder->get_widget("AddToolCMD", toolCommand);
+				this->__builder->get_widget("AddToolDo", toolFinish);
 
-				// New dialog / close
+				// New dialog
 				{
 					newToolButton->signal_clicked().connect([newToolDialog, toolName, toolFinish, toolDescription, toolCommand]() -> void {
+						// Reset
 						toolName->set_text("");
-						toolDescription->set_buffer(Gtk::TextBuffer::create());
-						toolCommand->set_buffer(Gtk::TextBuffer::create());
+						toolDescription->set_text("");
+						toolCommand->set_text("");
 						toolFinish->set_sensitive(false);
+
+						// Show
 						newToolDialog->show_all();
 					});
-
-					auto closeFunc = [newToolDialog]() -> void {
-						newToolDialog->hide();
-					};
-					toolExit->signal_clicked().connect(closeFunc);
 				}
 
 				// Dialog update checkers
 				{
-					auto updateCheck = [this, toolName, newToolDialog, toolFinish]() -> void {
+					auto updateCheck = [this, toolName, toolFinish]() -> void {
 						string text = toolName->get_text();
 						if(text == "") {
 							toolFinish->set_sensitive(false);
