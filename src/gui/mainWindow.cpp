@@ -270,8 +270,8 @@ class MainWindow {
 				// Dialog finished
 				toolFinish->signal_clicked().connect([this, newToolDialog, toolName, toolDescription, toolCommand]() -> void {
 					newToolDialog->hide();
-					this->__transitions.addTool({toolName->get_text(), toolDescription->get_buffer()->get_text(), toolCommand->get_buffer()->get_text()});
-					// TODO: Open new tool view
+					const Tool* tool = this->__transitions.addTool({toolName->get_text(), toolDescription->get_buffer()->get_text(), toolCommand->get_buffer()->get_text()});
+					this->__create_tab(*const_cast<Tool*>(tool));
 				});
 			}
 

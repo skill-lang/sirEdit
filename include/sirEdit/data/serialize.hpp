@@ -111,9 +111,11 @@ namespace sirEdit::data {
 				return this->serializer;
 			}
 
-			void addTool(Tool tool) {
-				this->serializer.addTool(new Tool(std::move(tool)));
+			const Tool* addTool(Tool tool) {
+				Tool* tmp = new Tool(std::move(tool));
+				this->serializer.addTool(tmp);
 				updateCall(this->change_callback);
+				return tmp;
 			}
 			void setFieldStatus(const Tool& tool, const Type& type, const Field& field, FIELD_STATE state, const std::function<void(const Type&, const Field&, FIELD_STATE, FIELD_STATE)>& callback_field, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
 				// Set state
