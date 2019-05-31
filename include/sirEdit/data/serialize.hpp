@@ -62,6 +62,7 @@ namespace sirEdit::data {
 				this->tools.push_back(tool);
 				this->addBaseTool(tool);
 			}
+			virtual void prepareSave() = 0;
 			virtual void save() = 0;
 
 			const std::vector<Type*>& getTypes() const {

@@ -96,9 +96,9 @@ namespace {
 				// Read tools
 				for(auto& i : this->sf->Tool->all()) {
 					Tool* tmpTool = new Tool();
-					// TODO: Comment
-					// TODO: Build command
 					tmpTool->getName() = std::move(std::string(i.getName()->begin(), i.getName()->end()));
+					tmpTool->getDescription() = std::move(std::string(i.getDescription()->begin(), i.getDescription()->end()));
+					tmpTool->getCommand() = std::move(std::string(i.getCommand()->begin(), i.getCommand()->end()));
 					//for(auto& j : i.getSelectedFields()) {
 					//	j.getData();
 					//	Type* selectedType = this->typesInverse[j];
@@ -127,6 +127,8 @@ namespace {
 			void getBaseTools(std::function<void(Tool*)> callbackFunc) {
 				for(auto& i : this->tools)
 					callbackFunc(i.first);
+			}
+			void prepareSave() {
 			}
 			void save() {
 				throw; // TODO:
