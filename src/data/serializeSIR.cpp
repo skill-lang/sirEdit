@@ -24,7 +24,7 @@ inline std::string _getName(SOURCE* type) {
 }
 
 template<class SOURCE>
-inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source) {
+inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source, unordered_map<sir::FieldLike*, Field*>& inverse) {
 	if(source == nullptr)
 		throw std::invalid_argument("Source is null pointer");
 	std::vector<sirEdit::data::Field> fields;
@@ -32,19 +32,20 @@ inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source
 	size_t counter = 0;
 	for(sir::FieldLike* i : *(source->getFields())) {
 		fields[counter] = std::move(sirEdit::data::Field(_getName(i), "", "")); // TODO: Add comments and type
+		inverse[i] = &(fields[counter]);
 		counter++;
 	}
 	return std::move(std::make_unique<sirEdit::data::TypeWithFields>(_getName(source), "", fields)); // TODO: Add comments
 }
-inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
+inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf, unordered_map<sir::FieldLike*, Field*>& inverse) {
 	std::string skillType = uf.skillName();
 	sirEdit::data::Type* result;
 	if(skillType == sir::ClassType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf)));
+		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf), inverse));
 		result = new TypeClass(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else if(skillType == sir::InterfaceType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf)));
+		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf), inverse));
 		result = new TypeInterface(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else
@@ -60,6 +61,7 @@ namespace {
 			unordered_map<Type*, sir::Type*> types;
 			unordered_map<sir::Type*, Type*> typesInverse;
 			unordered_map<Tool*, sir::Tool*> tools;
+			unordered_map<sir::FieldLike*, Field*> fieldInverse;
 
 			template<class TYPE, class SOURCE>
 			void addSuper(const SOURCE& source) {
@@ -84,7 +86,7 @@ namespace {
 
 				// Read types
 				for(auto& i : this->sf->UserdefinedType->all()) {
-					Type* tmpType = genBaseType(i);
+					Type* tmpType = genBaseType(i, this->fieldInverse);
 					this->types[tmpType] = &i;
 					this->typesInverse[&i] = tmpType;
 				}
@@ -99,10 +101,80 @@ namespace {
 					tmpTool->getName() = std::move(std::string(i.getName()->begin(), i.getName()->end()));
 					tmpTool->getDescription() = std::move(std::string(i.getDescription()->begin(), i.getDescription()->end()));
 					tmpTool->getCommand() = std::move(std::string(i.getCommand()->begin(), i.getCommand()->end()));
-					//for(auto& j : i.getSelectedFields()) {
-					//	j.getData();
-					//	Type* selectedType = this->typesInverse[j];
-					//}
+
+					// Load type states
+					for(auto& j : *(i.getSelectedUserTypes())) {
+						// Find type
+						Type* type = nullptr;
+						{
+							sir::UserdefinedType* tmp_type = j.first;
+							auto tmp = this->typesInverse.find(tmp_type);
+							if(tmp != this->typesInverse.end())
+								type = tmp->second;
+							else
+								continue;
+						}
+
+						// Parse state
+						TYPE_STATE state;
+						if(*(j.second) == "u")
+							state = TYPE_STATE::NO;
+						else if(*(j.second) == "r")
+							state = TYPE_STATE::READ;
+						else if(*(j.second) == "w")
+							state = TYPE_STATE::WRITE;
+						else if(*(j.second) == "d")
+							state = TYPE_STATE::DELETE;
+						else
+							continue;
+
+						// Set data
+						tmpTool->setTypeState(*type, state);
+					}
+
+					// Load field states
+					for(auto& j : *(i.getSelectedFields())) {
+						// Find type
+						Type* type = nullptr;
+						{
+							sir::UserdefinedType* tmp_type = j.first;
+							auto tmp = this->typesInverse.find(tmp_type);
+							if(tmp != this->typesInverse.end())
+								type = tmp->second;
+							else
+								continue;
+						}
+
+						// Do fields
+						for(auto& k : *(j.second)) {
+							// Find field
+							Field* field = nullptr;
+							{
+								sir::FieldLike* tmp_field = k.first;
+								auto tmp = this->fieldInverse.find(tmp_field);
+								if(tmp != this->fieldInverse.end())
+									field = tmp->second;
+								else
+									continue;
+							}
+
+							// Parse state
+							FIELD_STATE state;
+							if(*(k.second) == "u")
+								state = FIELD_STATE::NO;
+							else if(*(k.second) == "r")
+								state = FIELD_STATE::READ;
+							else if(*(k.second) == "w")
+								state = FIELD_STATE::WRITE;
+							else if(*(k.second) == "c")
+								state = FIELD_STATE::CREATE;
+							else
+								continue;
+
+							// Set data
+							tmpTool->setFieldState(*type, *field, state);
+						}
+					}
 					this->tools[tmpTool] = &i;
 				}
 
@@ -129,6 +201,7 @@ namespace {
 					callbackFunc(i.first);
 			}
 			void prepareSave() {
+				throw; // TODO:
 			}
 			void save() {
 				throw; // TODO:
