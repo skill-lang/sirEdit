@@ -33,7 +33,7 @@ class EditTool : public Gtk::Popover {
 		Gtk::Entry name;
 		Gtk::Entry description;
 		Gtk::Entry cmd;
-		Gtk::Button okaybutton;
+		Gtk::Button okaybutton = move(Gtk::Button(Gtk::StockID("gtk-apply")));
 
 		Tool* tool;
 		Transactions& transactions;
@@ -41,7 +41,6 @@ class EditTool : public Gtk::Popover {
 	public:
 		EditTool(Tool* tool, Transactions& transactions) : tool(tool), transactions(transactions) {
 			// Basic layout
-			this->okaybutton.set_label("gtk-apply");
 			this->add(this->layer);
 			this->layer.pack_start(this->name, true, false);
 			this->layer.pack_start(this->description, true, false);
@@ -75,6 +74,7 @@ class EditTool : public Gtk::Popover {
 				return;
 			});
 			this->okaybutton.signal_clicked().connect([this]() -> void {
+				this->hide();
 				this->remove();
 			});
 		}
@@ -98,15 +98,15 @@ class MainWindow {
 		// Tab management
 		//
 		void __create_tab(Tool& tool) {
-			Gtk::HBox* labelBox = new Gtk::HBox();
-			Gtk::Label* label = new Gtk::Label(tool.getName());
-			Gtk::Image* closeImage = new Gtk::Image(Gtk::Stock::CLOSE, Gtk::ICON_SIZE_BUTTON);
-			Gtk::Button* closeButon = new Gtk::Button();
+			Gtk::HBox* labelBox = Gtk::manage(new Gtk::HBox());
+			Gtk::Label* label = Gtk::manage(new Gtk::Label(tool.getName()));
+			Gtk::Image* closeImage = Gtk::manage(new Gtk::Image(Gtk::Stock::CLOSE, Gtk::ICON_SIZE_BUTTON));
+			Gtk::Button* closeButton = Gtk::manage(new Gtk::Button());
 			// TODO: Close tab
-			closeButon->add(*closeImage);
-			closeButon->set_property("relief", Gtk::RELIEF_NONE);
+			closeButton->add(*closeImage);
+			closeButton->set_property("relief", Gtk::RELIEF_NONE);
 			labelBox->pack_start(*label);
-			labelBox->pack_end(*closeButon);
+			labelBox->pack_end(*closeButton);
 			labelBox->show_all();
 			Gtk::Widget* content = createToolEdit(tool.getName(), this->__transitions);
 			auto tmp = this->__notebook->append_page(*content, *labelBox);
@@ -156,19 +156,24 @@ class MainWindow {
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::EXECUTE, Gtk::ICON_SIZE_BUTTON))));
-							top->pack_end(*button, false, true);
+							top->pack_start(*button, false, true);
 						}
 						{
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
+							button->signal_clicked().connect([button, i, this]() -> void {
+								EditTool* editTool = Gtk::manage(new EditTool(i, this->__transitions));
+								editTool->set_relative_to(*button);
+								editTool->show_all();
+							});
 							button->set_relief(Gtk::RELIEF_NONE);
-							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::PROPERTIES, Gtk::ICON_SIZE_BUTTON))));
-							top->pack_end(*button, false, true);
+							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::EDIT, Gtk::ICON_SIZE_BUTTON))));
+							top->pack_start(*button, false, true);
 						}
 						{
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::DELETE, Gtk::ICON_SIZE_BUTTON))));
-							top->pack_end(*button, false, true);
+							top->pack_start(*button, false, true);
 						}
 						main->pack_start(*top, true, true);
 					}
