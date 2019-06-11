@@ -152,6 +152,8 @@ namespace sirEdit::data {
 				}
 
 				// Callback type
+				for(auto& i : field.getType().types)
+					this->updateParentTypes(tool, *i, callback_type);
 				this->updateParentTypes(tool, type, callback_type);
 				updateCall(this->change_callback);
 			}

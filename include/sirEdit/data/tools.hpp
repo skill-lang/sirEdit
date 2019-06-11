@@ -21,6 +21,7 @@ namespace sirEdit::data {
 			// Cache for deep search of type
 			//
 			mutable std::unordered_map<const Type*, bool> __cacheTransitiveType;
+			std::unordered_map<const Type*, uint64_t> __setTypeFields;
 			bool __hasReadSubtype(const Type& type) const {
 				// Test cache
 				{
@@ -44,8 +45,42 @@ namespace sirEdit::data {
 						this->__cacheTransitiveType[&type] = true;
 						return true;
 					}
+
+				// Test fields
+				{
+					auto tmp = this->__setTypeFields.find(&type);
+					if(tmp != this->__setTypeFields.end() && tmp->second > 0) {
+						this->__cacheTransitiveType[&type] = true;
+						return true;
+					}
+				}
+
+				// Not found
 				this->__cacheTransitiveType[&type] = false;
 				return false;
+			}
+
+			inline void __setField(const Field& field) {
+				for(auto& i : field.getType().types) {
+					// Set state
+					auto tmp = this->__setTypeFields.find(i);
+					if(tmp == this->__setTypeFields.end())
+						this->__setTypeFields[i] = 1;
+					else
+						this->__setTypeFields[i]++;
+
+					// Clean cache
+					this->__cleanCacheType(*i);
+				}
+			}
+			inline void __unsetField(const Field& field) {
+				for(auto& i : field.getType().types) {
+					// Unset
+					this->__setTypeFields[i]--;
+
+					// Clean cache
+					this->__cleanCacheType(*i);
+				}
 			}
 
 			//
@@ -163,11 +198,26 @@ namespace sirEdit::data {
 				// Set state
 				FIELD_STATE old = this->getFieldSetState(field, type);
 				{
+					// Find field
 					auto tmp = this->__statesFields.find(&field);
 					if(tmp == this->__statesFields.end()) {
 						this->__statesFields[&field] = {};
 						tmp = this->__statesFields.find(&field);
 					}
+
+					// Find type
+					auto tmp2 = tmp->second.find(&type);
+					if(tmp2 == tmp->second.end()) {
+						tmp->second[&type] = FIELD_STATE::NO;
+						tmp2 = tmp->second.find(&type);
+					}
+
+					// Activate field
+					if(state >= FIELD_STATE::READ && tmp2->second <= FIELD_STATE::UNUSED)
+						this->__setField(field);
+					else if(state <= FIELD_STATE::UNUSED && tmp2->second >= FIELD_STATE::READ)
+						this->__unsetField(field);
+
 					tmp->second[&type] = state;
 				}
 
