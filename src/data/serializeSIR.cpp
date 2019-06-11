@@ -159,6 +159,43 @@ inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fi
 	}
 }
 
+template<class TYPE1, class TYPE2>
+inline void _addInterfacesHelper(TYPE1* type, unordered_map<Type*, sir::Type*>& types, unordered_map<sir::Type*, Type*>& typeInverse) {
+	// Check
+	if(type == nullptr)
+		throw; // BAD CAST!!!
+
+	// Find base type
+	TYPE2* tmpSirType;
+	{
+		auto tmp = types.find(type);
+		if(tmp == types.end())
+			throw; // That should never happen!
+		tmpSirType = dynamic_cast<TYPE2*>(tmp->second);
+		if(tmpSirType == nullptr)
+			throw; // That should never happen!
+	}
+
+	// Update interfaces
+	if(tmpSirType->getInterfaces() != nullptr)
+		for(auto& i : *(tmpSirType->getInterfaces())) {
+			auto tmp = typeInverse.find(i);
+			if(tmp == typeInverse.end())
+				throw; // That should never happen!
+			TypeInterface* tmp2 = dynamic_cast<TypeInterface*>(tmp->second);
+			if(tmp2 == nullptr)
+				throw; // That should never happen!
+			type->getInterfaces().push_back(tmp2);
+		}
+}
+inline void addInterfaces(Type& type, unordered_map<Type*, sir::Type*>& types, unordered_map<sir::Type*, Type*>& typeInverse) {
+	doBaseType(type, []() -> void {}, [&type, &types, &typeInverse]() -> void {
+		_addInterfacesHelper<TypeInterface, sir::InterfaceType>(dynamic_cast<TypeInterface*>(&type), types, typeInverse);
+	}, [&type, &types, &typeInverse]() -> void {
+		_addInterfacesHelper<TypeClass, sir::ClassType>(dynamic_cast<TypeClass*>(&type), types, typeInverse);
+	});
+}
+
 namespace {
 	class SerializerSIR : public Serializer
 	{
@@ -201,6 +238,19 @@ namespace {
 				// Gen super
 				this->addSuper<TypeClass>(this->sf->ClassType->all());
 				this->addSuper<TypeInterface>(this->sf->InterfaceType->all());
+
+				// Add interfaces
+				for(auto& i : this->types)
+					addInterfaces(*(i.first), this->types, this->typesInverse);
+
+				// Update fields
+				for(auto& i : this->types) {
+					TypeWithFields* tmp = dynamic_cast<TypeWithFields*>(i.first);
+					if(tmp == nullptr)
+						throw; // That sould not happen!
+					for(auto& j : tmp->getFields())
+						updateField(j, this->field, this->typesInverse);
+				}
 
 				// Read tools
 				for(auto& i : this->sf->Tool->all()) {
@@ -283,15 +333,6 @@ namespace {
 						}
 					}
 					this->tools[tmpTool] = &i;
-				}
-
-				// Update fields
-				for(auto& i : this->types) {
-					TypeWithFields* tmp = dynamic_cast<TypeWithFields*>(i.first);
-					if(tmp == nullptr)
-						throw; // That sould not happen!
-					for(auto& j : tmp->getFields())
-						updateField(j, this->field, this->typesInverse);
 				}
 
 				// Run general updates

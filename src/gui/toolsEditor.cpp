@@ -190,6 +190,10 @@ class Tab : public Gtk::HPaned
 			if(super != nullptr)
 				this->buildFieldsLayer(*super, tmp_types);
 
+			// Call interfaces
+			for(auto& i : getInterfaces(type))
+				this->buildFieldsLayer(*i, tmp_types);
+
 			// Create type row
 			Gtk::TreeStore::Row typeRow;
 			if(super != nullptr)

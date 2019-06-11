@@ -105,7 +105,7 @@ namespace sirEdit::data
 	};
 
 	template<class FUNC_BASE, class FUNC_INTERFACE, class FUNC_CLASS>
-	inline auto doBaseType(const Type* type, FUNC_BASE funcBase, FUNC_INTERFACE funcInterface, FUNC_CLASS funcClass) {
+	inline decltype((*static_cast<FUNC_BASE*>(nullptr))()) doBaseType(const Type* type, FUNC_BASE funcBase, FUNC_INTERFACE funcInterface, FUNC_CLASS funcClass) {
 		if(dynamic_cast<const TypeInterface*>(type) != nullptr)
 			return funcInterface();
 		else if(dynamic_cast<const TypeClass*>(type) != nullptr)
@@ -129,6 +129,14 @@ namespace sirEdit::data
 		auto isBase = []() -> const Type* { return nullptr; };
 		auto isInterface = [&type]() -> const Type* { return dynamic_cast<const TypeInterface*>(&type)->getSuper(); };
 		auto isClass = [&type]() -> const Type* { return dynamic_cast<const TypeClass*>(&type)->getSuper(); };
+		return doBaseType(&type, isBase, isInterface, isClass);
+	}
+
+	static const std::vector<TypeInterface*> __getInterfacesEmpty;
+	inline const std::vector<TypeInterface*>& getInterfaces(const Type& type) {
+		auto isBase = []() -> const std::vector<TypeInterface*>& { return __getInterfacesEmpty; };
+		auto isInterface = [&type]() -> const std::vector<TypeInterface*>& { return dynamic_cast<const TypeInterface*>(&type)->getInterfaces(); };
+		auto isClass = [&type]() -> const std::vector<TypeInterface*>& { return dynamic_cast<const TypeClass*>(&type)->getInterfaces(); };
 		return doBaseType(&type, isBase, isInterface, isClass);
 	}
 
