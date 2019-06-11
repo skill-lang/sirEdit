@@ -62,6 +62,7 @@ class FieldListModel : public Gtk::TreeModel::ColumnRecord
 		Gtk::TreeModelColumn<bool> data_status_u_transitive;
 		Gtk::TreeModelColumn<bool> data_status_no;
 		Gtk::TreeModelColumn<bool> data_status_no_transitive;
+		Gtk::TreeModelColumn<const Field*> data_field;
 
 		FieldListModel() {
 			this->add(data_sort_name);
@@ -77,6 +78,7 @@ class FieldListModel : public Gtk::TreeModel::ColumnRecord
 			this->add(data_status_w_transitive);
 			this->add(data_status_e);
 			this->add(data_status_e_transitive);
+			this->add(data_field);
 		}
 };
 static FieldListModel fieldListModel;
@@ -214,6 +216,7 @@ class Tab : public Gtk::HPaned
 						tmp[fieldListModel.data_name] = i.getName() + " : " + i.printType();
 						tmp[fieldListModel.data_sort_name] = std::string("b_") + i.getName();
 						tmp[fieldListModel.data_status_active] = true;
+						tmp[fieldListModel.data_field] = &i;
 						this->field_lookup[i.getName()] = const_cast<Field*>(&i);
 						this->fieldUpdate(tmp, this->tool.getFieldTransitiveState(i), this->tool.getFieldSetState(i, *fields));
 					}
@@ -262,12 +265,10 @@ class Tab : public Gtk::HPaned
 				throw; // This should NEVER happen!
 
 			// Find field
-			auto field = this->field_lookup.find(static_cast<string>(row->get_value(fieldListModel.data_name)));
-			if(field == this->field_lookup.end())
-				throw; // That should NEVER happen!
+			auto field = static_cast<const Field*>(row->get_value(fieldListModel.data_field));
 
 			// Set field state
-			this->transactions.setFieldStatus(this->tool, *(this->currentType), *(field->second), state, [this, &id](const Type& type, const Field& field, FIELD_STATE tool_state, FIELD_STATE type_state) -> void {
+			this->transactions.setFieldStatus(this->tool, *(this->currentType), *(field), state, [this, &id](const Type& type, const Field& field, FIELD_STATE tool_state, FIELD_STATE type_state) -> void {
 				this->fieldUpdate(*(this->fieldListData->get_iter(id)), tool_state, type_state);
 			}, [this, &id](const Type& type, TYPE_STATE tool_state, TYPE_STATE set_state) -> void {
 				this->typeUpdate(this->type_lookup.find(&type)->second, tool_state, set_state);
