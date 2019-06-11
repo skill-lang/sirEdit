@@ -173,7 +173,7 @@ class Tab : public Gtk::HPaned
 			for(auto& i : super.getSubTypes()) {
 				Gtk::TreeStore::Row tmp = *(typeListData->append(row.children()));
 				tmp[typeListModel.data_id] = i;
-				tmp[typeListModel.data_name] = i->getName();
+				tmp[typeListModel.data_name] = i->getName() + " : " + i->getMetaTypeName();
 				this->typeUpdate(tmp, this->tool.getTypeTransitiveState(*i), this->tool.getTypeSetState(*i));
 				type_lookup[i] = tmp;
 				buildTreeSubRows(tmp, *i);
@@ -292,7 +292,7 @@ class Tab : public Gtk::HPaned
 					for(auto& i : transactions.getData().getBaseTypes()) {
 						Gtk::TreeStore::Row tmp = *(typeListData->append());
 						tmp[typeListModel.data_id] = i;
-						tmp[typeListModel.data_name] = i->getName();
+						tmp[typeListModel.data_name] = i->getName() + " : " + i->getMetaTypeName();
 						this->buildTreeSubRows(tmp, *i);
 						this->type_lookup[i] = tmp;
 						this->typeUpdate(tmp, this->tool.getTypeTransitiveState(*i), this->tool.getTypeSetState(*i));

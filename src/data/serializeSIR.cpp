@@ -16,41 +16,147 @@ using namespace std;
 //
 
 template<class SOURCE>
-inline std::string _getName(SOURCE* type) {
+inline std::string parseString(SOURCE* source) {
 	std::string result;
-	for(int i = 0; i < type->getName()->getParts()->size(); i++)
-		result += type->getName()->getParts()->get(i).string->c_str();
+	for(int i = 0; i < source->size(); i++)
+		result += source->get(i).string->c_str();
 	return result;
+}
+inline std::string parseComment(sir::Comment* comment) {
+	if(comment == nullptr)
+		return "";
+	auto tmp = comment->getText();
+	if(tmp == nullptr)
+		return "";
+	return parseString(tmp);
 }
 
 template<class SOURCE>
-inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source, unordered_map<sir::FieldLike*, Field*>& inverse) {
+inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source, unordered_map<Field*, sir::FieldLike*>& field, unordered_map<sir::FieldLike*, Field*>& inverse) {
 	if(source == nullptr)
 		throw std::invalid_argument("Source is null pointer");
 	std::vector<sirEdit::data::Field> fields;
 	fields.resize(source->getFields()->size());
 	size_t counter = 0;
 	for(sir::FieldLike* i : *(source->getFields())) {
-		fields[counter] = std::move(sirEdit::data::Field(_getName(i), "", "")); // TODO: Add comments and type
+		fields[counter] = std::move(sirEdit::data::Field(parseString(i->getName()->getParts()), parseComment(i->getComment()), {})); // TODO: Add comments and type
 		inverse[i] = &(fields[counter]);
+		field[&(fields[counter])] = i;
 		counter++;
 	}
-	return std::move(std::make_unique<sirEdit::data::TypeWithFields>(_getName(source), "", fields)); // TODO: Add comments
+	return std::move(std::make_unique<sirEdit::data::TypeWithFields>(parseString(source->getName()->getParts()), parseComment(source->getComment()), fields)); // TODO: Add comments
 }
-inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf, unordered_map<sir::FieldLike*, Field*>& inverse) {
+inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf, unordered_map<Field*, sir::FieldLike*>& field, unordered_map<sir::FieldLike*, Field*>& inverse) {
 	std::string skillType = uf.skillName();
 	sirEdit::data::Type* result;
 	if(skillType == sir::ClassType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf), inverse));
+		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf), field, inverse));
 		result = new TypeClass(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else if(skillType == sir::InterfaceType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf), inverse));
+		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf), field, inverse));
 		result = new TypeInterface(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else
 		throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
 	return result;
+}
+
+inline Type* addBuildinType(sir::Type* type, unordered_map<sir::Type*, Type*>& typeInverse) {
+	// Check type
+	if(dynamic_cast<sir::UserdefinedType*>(type) != nullptr)
+		throw; // That sould not happen!
+	if(dynamic_cast<sir::SingleBaseTypeContainer*>(type) != nullptr)
+		throw; // That sould not happen!
+
+	// Add new type
+	sir::SimpleType* tmp_st = dynamic_cast<sir::SimpleType*>(type);
+	if(tmp_st == nullptr)
+		throw; // That should not happen
+	Type* tmp = new Type(parseString(tmp_st->getName()->getParts()), "");
+	typeInverse[type] = tmp;
+	return tmp;
+}
+inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fields, unordered_map<sir::Type*, Type*>& typeInverse) {
+	// Find field
+	sir::FieldLike* orignalField = nullptr;
+	{
+		auto tmp = fields.find(&field);
+		if(tmp == fields.end())
+			throw;
+		else
+			orignalField = tmp->second;
+	}
+
+	// Update field
+	sir::MapType* tmp_map;
+	sir::ConstantLengthArrayType* tmp_carray;
+	sir::SingleBaseTypeContainer* tmp_array;
+	if(dynamic_cast<sir::UserdefinedType*>(orignalField->getType()) != nullptr || dynamic_cast<sir::SimpleType*>(orignalField->getType()) != nullptr) { // Simple type
+		field.getType().combination = FieldType::TYPE_COMBINATION::SINGLE_TYPE;
+		Type* tmp_type;
+		{
+			auto tmp = typeInverse.find(orignalField->getType());
+			if(tmp == typeInverse.end())
+				tmp_type = addBuildinType(orignalField->getType(), typeInverse);
+			else
+				tmp_type = tmp->second;
+		}
+		field.getType().types = {tmp_type};
+	}
+	else if((tmp_map = dynamic_cast<sir::MapType*>(orignalField->getType())) != nullptr) { // Map type
+		field.getType().combination = FieldType::TYPE_COMBINATION::MAP;
+		for(auto& i : *(tmp_map->getBase())) {
+			Type* tmp_type;
+			{
+				auto tmp = typeInverse.find(i);
+				if(tmp == typeInverse.end())
+					tmp_type = addBuildinType(i, typeInverse);
+				else
+					tmp_type = tmp->second;
+			}
+			field.getType().types.push_back(tmp_type);
+		}
+	}
+	else if((tmp_carray = dynamic_cast<sir::ConstantLengthArrayType*>(orignalField->getType())) != nullptr) { // Constant array
+		if(*(tmp_carray->getKind()) != "array")
+			throw; // Bad array
+		field.getType().combination = FieldType::TYPE_COMBINATION::STATIC_ARRAY;
+		Type* tmp_type;
+		{
+			auto tmp = typeInverse.find(tmp_carray->getBase());
+			if(tmp == typeInverse.end())
+				tmp_type = addBuildinType(tmp_carray->getBase(), typeInverse);
+			else
+				tmp_type = tmp->second;
+		}
+		field.getType().types = {tmp_type};
+		field.getType().arraySize = tmp_carray->getLength();
+	}
+	else if((tmp_array = dynamic_cast<sir::SingleBaseTypeContainer*>(orignalField->getType())) != nullptr) { // Array types
+		if(*(tmp_array->getKind()) == "array")
+			field.getType().combination = FieldType::TYPE_COMBINATION::DYNAMIC_ARRAY;
+		else if(*(tmp_array->getKind()) == "list")
+			field.getType().combination = FieldType::TYPE_COMBINATION::LIST;
+		else if(*(tmp_array->getKind()) == "set")
+			field.getType().combination = FieldType::TYPE_COMBINATION::SET;
+		else
+			throw; // Unkown type
+
+		// Set type
+		Type* tmp_type;
+		{
+			auto tmp = typeInverse.find(tmp_array->getBase());
+			if(tmp == typeInverse.end())
+				tmp_type = addBuildinType(tmp_array->getBase(), typeInverse);
+			else
+				tmp_type = tmp->second;
+		}
+		field.getType().types = {tmp_type};
+	}
+	else {
+		throw std::runtime_error(std::string("Unkown type ") + orignalField->getType()->skillName()); // Unkown type
+	}
 }
 
 namespace {
@@ -61,6 +167,7 @@ namespace {
 			unordered_map<Type*, sir::Type*> types;
 			unordered_map<sir::Type*, Type*> typesInverse;
 			unordered_map<Tool*, sir::Tool*> tools;
+			unordered_map<Field*, sir::FieldLike*> field;
 			unordered_map<sir::FieldLike*, Field*> fieldInverse;
 
 			template<class TYPE, class SOURCE>
@@ -86,7 +193,7 @@ namespace {
 
 				// Read types
 				for(auto& i : this->sf->UserdefinedType->all()) {
-					Type* tmpType = genBaseType(i, this->fieldInverse);
+					Type* tmpType = genBaseType(i, this->field, this->fieldInverse);
 					this->types[tmpType] = &i;
 					this->typesInverse[&i] = tmpType;
 				}
@@ -176,6 +283,15 @@ namespace {
 						}
 					}
 					this->tools[tmpTool] = &i;
+				}
+
+				// Update fields
+				for(auto& i : this->types) {
+					TypeWithFields* tmp = dynamic_cast<TypeWithFields*>(i.first);
+					if(tmp == nullptr)
+						throw; // That sould not happen!
+					for(auto& j : tmp->getFields())
+						updateField(j, this->field, this->typesInverse);
 				}
 
 				// Run general updates

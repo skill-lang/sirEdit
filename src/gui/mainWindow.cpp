@@ -1,9 +1,6 @@
 #include <gtkmm.h>
 #include "mainWindow.hpp"
 #include <sirEdit/main.hpp>
-
-extern std::string sirEdit_mainWindow_glade;
-
 #include <list>
 #include <unordered_map>
 
@@ -12,20 +9,9 @@ using namespace sirEdit;
 using namespace sirEdit::data;
 using namespace sirEdit::gui;
 
-class TmpModel : public Gtk::TreeModel::ColumnRecord
-{
-	public:
-		Gtk::TreeModelColumn<Glib::ustring> data_name;
-		Gtk::TreeModelColumn<bool> data_used;
-		Gtk::TreeModelColumn<bool> data_active;
 
-		TmpModel() {
-			this->add(data_used);
-			this->add(data_active);
-			this->add(data_name);
-		}
-};
-//static TmpModel tmpModel;
+extern string sirEdit_mainWindow_glade;
+
 
 class EditTool : public Gtk::Popover {
 	private:
