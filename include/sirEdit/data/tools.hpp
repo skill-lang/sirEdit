@@ -56,9 +56,14 @@ namespace sirEdit::data {
 				{
 					const Type* current = &type;
 					while(current != nullptr) {
+						 // Remove current
 						auto tmp = this->__cacheTransitiveType.find(current);
 						if(tmp != this->__cacheTransitiveType.end())
 							this->__cacheTransitiveType.erase(tmp);
+
+						// Do interfaces
+						for(auto& i : getInterfaces(*current))
+							this->__cleanCacheType(*i);
 						current = getSuper(*current);
 					}
 				}
@@ -123,6 +128,12 @@ namespace sirEdit::data {
 				// Get current state
 				TYPE_STATE result = TYPE_STATE::READ;
 				{
+					// Check if field gets created
+					for(auto& i : getFields(type))
+						if(this->getFieldTransitiveState(i) == FIELD_STATE::CREATE)
+							result = std::max(TYPE_STATE::WRITE, result);
+
+					// Get set state
 					auto tmp = this->__statesType.find(&type);
 					if(tmp != this->__statesType.end())
 						result = std::max(std::get<1>(tmp->second), result);

@@ -173,6 +173,8 @@ class Tab : public Gtk::HPaned
 		//
 		void buildTreeSubRows(Gtk::TreeStore::Row& row, const Type& super) {
 			for(auto& i : super.getSubTypes()) {
+				if(getSuper(*i) != &super)
+					continue; // Remove doubelling
 				Gtk::TreeStore::Row tmp = *(typeListData->append(row.children()));
 				tmp[typeListModel.data_id] = i;
 				tmp[typeListModel.data_name] = i->getName() + " : " + i->getMetaTypeName();

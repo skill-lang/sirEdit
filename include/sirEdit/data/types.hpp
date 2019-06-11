@@ -140,6 +140,14 @@ namespace sirEdit::data
 		return doBaseType(&type, isBase, isInterface, isClass);
 	}
 
+	static const std::vector<Field> __getFieldsEmpty;
+	inline const std::vector<Field>& getFields(const Type& type) {
+		auto isBase = []() -> const std::vector<Field>& { return __getFieldsEmpty; };
+		auto isInterface = [&type]() -> const std::vector<Field>& { return dynamic_cast<const TypeInterface*>(&type)->getFields(); };
+		auto isClass = [&type]() -> const std::vector<Field>& { return dynamic_cast<const TypeClass*>(&type)->getFields(); };
+		return doBaseType(&type, isBase, isInterface, isClass);
+	}
+
 	inline std::string Field::printType() const {
 		// Type parse
 		std::string result;

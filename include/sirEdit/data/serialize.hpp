@@ -18,11 +18,18 @@ namespace sirEdit::data {
 			std::vector<Tool*> tools;
 
 			void updateTypeInfo(Type* type) {
-				Type* tmp = const_cast<Type*>(getSuper(*type));
-				if(tmp != nullptr)
-					tmp->getSubTypes().push_back(type);
-				else
-					this->baseTypes.push_back(type);
+				// Base types
+				{
+					Type* tmp = const_cast<Type*>(getSuper(*type));
+					if(tmp != nullptr)
+						tmp->getSubTypes().push_back(type);
+					else
+						this->baseTypes.push_back(type);
+				}
+
+				// Interfaces
+				for(auto& i : getInterfaces(*type))
+					i->getSubTypes().push_back(type);
 			}
 
 		protected:
@@ -91,6 +98,22 @@ namespace sirEdit::data {
 					i();
 			}
 
+			void updateParentTypes(const Tool& tool, const Type& type, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
+				// Update super classes
+				const Type* current = &type;
+				while(current != nullptr) {
+					// Callback current type
+					callback_type(*current, tool.getTypeTransitiveState(*current), tool.getTypeSetState(*current));
+
+					// Update interfaces
+					for(auto& i : getInterfaces(*current))
+						updateParentTypes(tool, *i, callback_type);
+
+					// Update current
+					current = getSuper(*current);
+				}
+			}
+
 			void updateSubtypes(const Tool& tool, const Type& type, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
 				for(auto& i : type.getSubTypes()) {
 					auto tmp = tool.getTypeTransitiveState(type);
@@ -129,13 +152,7 @@ namespace sirEdit::data {
 				}
 
 				// Callback type
-				{
-					const Type* tmp_type = &type;
-					while(tmp_type != nullptr) {
-						callback_type(*tmp_type, tool.getTypeTransitiveState(*tmp_type), tool.getTypeSetState(*tmp_type));
-						tmp_type = getSuper(*tmp_type);
-					}
-				}
+				this->updateParentTypes(tool, type, callback_type);
 				updateCall(this->change_callback);
 			}
 			void setTypeStatus(const Tool& tool, const Type& type, TYPE_STATE state, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
@@ -145,16 +162,8 @@ namespace sirEdit::data {
 
 				// Callback
 				TYPE_STATE newTrans = tool.getTypeTransitiveState(type);
-				callback_type(type, newTrans, state);
-				{
-					// Update super classes
-					const Type* current = getSuper(type);
-					while(current != nullptr) {
-						callback_type(*current, tool.getTypeTransitiveState(*current), tool.getTypeSetState(*current));
-						current = getSuper(*current);
-					}
-				}
-				if(oldTrans == TYPE_STATE::DELETE || newTrans == TYPE_STATE::DELETE) {
+				this->updateParentTypes(tool, type, callback_type);
+				if((oldTrans == TYPE_STATE::DELETE) != (newTrans == TYPE_STATE::DELETE)) {
 					// Update sub classes
 					updateSubtypes(tool, type, callback_type);
 				}
