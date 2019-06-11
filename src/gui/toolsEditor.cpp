@@ -197,7 +197,7 @@ class Tab : public Gtk::HPaned
 			else
 				typeRow = *(fieldListData->append());
 			tmp_types[type] = typeRow;
-			typeRow[fieldListModel.data_name] = type.getName();
+			typeRow[fieldListModel.data_name] = type.getName() + " : " + type.getMetaTypeName();
 			typeRow[fieldListModel.data_sort_name] = std::string("a_") + type.getName();
 			typeRow[fieldListModel.data_status_active] = false;
 
@@ -207,7 +207,7 @@ class Tab : public Gtk::HPaned
 				if(fields != nullptr)
 					for(auto& i : fields->getFields()) {
 						Gtk::TreeStore::Row tmp = *(fieldListData->append(typeRow.children()));
-						tmp[fieldListModel.data_name] = i.getName();
+						tmp[fieldListModel.data_name] = i.getName() + " : " + i.printType();
 						tmp[fieldListModel.data_sort_name] = std::string("b_") + i.getName();
 						tmp[fieldListModel.data_status_active] = true;
 						this->field_lookup[i.getName()] = const_cast<Field*>(&i);
