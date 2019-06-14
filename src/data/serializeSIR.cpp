@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <tuple>
 #include <functional>
+#include <stdexcept>
 
 using namespace sir::api;
 using namespace sirEdit::data;
@@ -31,35 +32,68 @@ inline std::string parseComment(sir::Comment* comment) {
 	return parseString(tmp);
 }
 
+template<class FUNC>
+inline void findFieldInSIR(sir::Type* type, FUNC func) {
+	std::string skillType = type->skillName();
+	if(skillType == sir::ClassType::typeName) {
+		func(static_cast<sir::ClassType*>(type)->getFields());
+	}
+	else if(skillType == sir::InterfaceType::typeName) {
+		func(static_cast<sir::InterfaceType*>(type)->getFields());
+	}
+	else
+		throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
+}
+
 template<class SOURCE>
-inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source, unordered_map<Field*, sir::FieldLike*>& field, unordered_map<sir::FieldLike*, Field*>& inverse) {
+inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source) {
 	if(source == nullptr)
 		throw std::invalid_argument("Source is null pointer");
 	std::vector<sirEdit::data::Field> fields;
 	fields.resize(source->getFields()->size());
 	size_t counter = 0;
 	for(sir::FieldLike* i : *(source->getFields())) {
-		fields[counter] = std::move(sirEdit::data::Field(parseString(i->getName()->getParts()), parseComment(i->getComment()), {})); // TODO: Add comments and type
-		inverse[i] = &(fields[counter]);
-		field[&(fields[counter])] = i;
+		fields[counter] = std::move(sirEdit::data::Field(parseString(i->getName()->getParts()), parseComment(i->getComment()), {}));
 		counter++;
 	}
-	return std::move(std::make_unique<sirEdit::data::TypeWithFields>(parseString(source->getName()->getParts()), parseComment(source->getComment()), fields)); // TODO: Add comments
+	return std::move(std::make_unique<sirEdit::data::TypeWithFields>(parseString(source->getName()->getParts()), parseComment(source->getComment()), std::move(fields))); // TODO: Add comments
 }
-inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf, unordered_map<Field*, sir::FieldLike*>& field, unordered_map<sir::FieldLike*, Field*>& inverse) {
+inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 	std::string skillType = uf.skillName();
 	sirEdit::data::Type* result;
 	if(skillType == sir::ClassType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf), field, inverse));
-		result = new TypeClass(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
+		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf)));
+		result = new TypeClass(std::move(*(fields.get())), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else if(skillType == sir::InterfaceType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf), field, inverse));
-		result = new TypeInterface(*(fields.get()), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
+		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf)));
+		result = new TypeInterface(std::move(*(fields.get())), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else
 		throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
 	return result;
+}
+
+inline void updateFields(Type* type, sir::Type* sirType, unordered_map<Field*, sir::FieldLike*>& fields, unordered_map<sir::FieldLike*, Field*>& inverses) {
+	// Find fields
+	TypeWithFields* twf = dynamic_cast<TypeWithFields*>(type);
+	if(twf == nullptr)
+		return; // Typedef
+
+	// Find fields in sir
+	decltype(static_cast<sir::ClassType*>(nullptr)->getFields()) sirTWF;
+	findFieldInSIR(sirType, [&sirTWF](auto tmp) -> void {
+		sirTWF = tmp;
+	});
+
+	// Update field information
+	auto j = sirTWF->begin();
+	for(auto i = twf->getFields().begin(); i != twf->getFields().end(); i++, j++) {
+		if(i->getName() != parseString((*j)->getName()->getParts()))
+			throw; // That should never happen!
+		fields[&(*i)] = *j;
+		inverses[*j] = &(*i);
+	}
 }
 
 inline Type* addBuildinType(sir::Type* type, unordered_map<sir::Type*, Type*>& typeInverse) {
@@ -82,11 +116,17 @@ inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fi
 	sir::FieldLike* orignalField = nullptr;
 	{
 		auto tmp = fields.find(&field);
-		if(tmp == fields.end())
-			throw;
+		if(tmp == fields.end()) {
+			std::string tmp = "";
+			for(auto& i : fields)
+				tmp += i.first->getName() +  ", ";
+			throw runtime_error("Can't find field " + field.getName() + " : " + tmp);
+		}
 		else
 			orignalField = tmp->second;
 	}
+
+	// TODO: Views and custome type
 
 	// Update field
 	sir::MapType* tmp_map;
@@ -230,7 +270,7 @@ namespace {
 
 				// Read types
 				for(auto& i : this->sf->UserdefinedType->all()) {
-					Type* tmpType = genBaseType(i, this->field, this->fieldInverse);
+					Type* tmpType = genBaseType(i);
 					this->types[tmpType] = &i;
 					this->typesInverse[&i] = tmpType;
 				}
@@ -243,11 +283,15 @@ namespace {
 				for(auto& i : this->types)
 					addInterfaces(*(i.first), this->types, this->typesInverse);
 
-				// Update fields
+				// Update fields pass 1
+				for(auto& i : this->types)
+					updateFields(i.first, i.second, this->field, this->fieldInverse);
+
+				// Update fileds pass 2
 				for(auto& i : this->types) {
 					TypeWithFields* tmp = dynamic_cast<TypeWithFields*>(i.first);
 					if(tmp == nullptr)
-						throw; // That sould not happen!
+						continue; // Alias type
 					for(auto& j : tmp->getFields())
 						updateField(j, this->field, this->typesInverse);
 				}
