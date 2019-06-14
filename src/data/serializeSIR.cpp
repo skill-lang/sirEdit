@@ -61,6 +61,8 @@ inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source
 inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 	std::string skillType = uf.skillName();
 	sirEdit::data::Type* result;
+
+	// Create type
 	if(skillType == sir::ClassType::typeName) {
 		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf)));
 		result = new TypeClass(std::move(*(fields.get())), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
@@ -71,6 +73,26 @@ inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 	}
 	else
 		throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
+
+	// Hints
+	if(uf.getHints() != nullptr)
+		for(auto& i : *(uf.getHints())) {
+			auto tmp = result->getHints().find(*(i->getName()));
+			if(tmp == result->getHints().end())
+				tmp = result->getHints().insert(make_pair(string(*(i->getName())), vector<string>())).first;
+			for(auto& j : *(i->getArguments()))
+				tmp->second.push_back(*j);
+
+		}
+	if(uf.getRestrictions() != nullptr)
+		for(auto& i : *(uf.getRestrictions())) {
+			auto tmp = result->getRestrictions().find(*(i->getName()));
+			if(tmp == result->getRestrictions().end())
+				tmp = result->getRestrictions().insert(make_pair(string(*(i->getName())), vector<string>())).first;
+			for(auto& j : *(i->getArguments()))
+				tmp->second.push_back(*j);
+
+		}
 	return result;
 }
 
