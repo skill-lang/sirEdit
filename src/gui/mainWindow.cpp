@@ -3,6 +3,7 @@
 #include <sirEdit/main.hpp>
 #include <list>
 #include <unordered_map>
+#include <sirEdit/data/tools.hpp>
 
 using namespace std;
 using namespace sirEdit;
@@ -12,6 +13,42 @@ using namespace sirEdit::gui;
 
 extern string sirEdit_mainWindow_glade;
 
+//
+// Export main
+//
+
+class ExportModel : public Gtk::TreeModel::ColumnRecord
+{
+	public:
+		Gtk::TreeModelColumn<Tool*> data_id;
+		Gtk::TreeModelColumn<Glib::ustring> data_name;
+
+		ExportModel() {
+			this->add(data_id);
+			this->add(data_name);
+		}
+};
+static ExportModel exportModel;
+
+inline void exportExample(Gtk::TreeView* tree) {
+	auto model = Gtk::TreeStore::create(exportModel);
+	{
+		auto tmp = *(model->append());
+		tmp[exportModel.data_name] = "-- ALL --";
+	}
+
+	{
+		auto tmp = *(model->append());
+		tmp[exportModel.data_name] = "Werkzeug1";
+	}
+	tree->set_model(model);
+	tree->append_column("Tool", exportModel.data_name);
+	tree->get_selection()->set_mode(Gtk::SelectionMode::SELECTION_MULTIPLE);
+}
+
+//
+// Edit tool
+//
 
 class EditTool : public Gtk::Popover {
 	private:
@@ -66,6 +103,10 @@ class EditTool : public Gtk::Popover {
 			});
 		}
 };
+
+//
+// Main Window
+//
 
 class MainWindow {
 	private:
@@ -196,6 +237,21 @@ class MainWindow {
 
 			// Notebook
 			this->__builder->get_widget("Notebook", this->__notebook);
+
+			// Export
+			{
+				Gtk::Button* button;
+				Gtk::Dialog* dialog;
+				Gtk::TreeView* tree;
+				this->__builder->get_widget("ExportButton", button);
+				this->__builder->get_widget("Export", dialog);
+				this->__builder->get_widget("ExportTools", tree);
+				button->signal_clicked().connect([dialog]() -> void {
+					// TODO: reset
+					dialog->show_all();
+				});
+				exportExample(tree);
+			}
 
 			// Tools pop-up
 			{
