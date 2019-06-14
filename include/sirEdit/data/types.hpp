@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <sirEdit/data/fields.hpp>
@@ -23,6 +24,8 @@ namespace sirEdit::data
 			std::vector<Type*> __subTypes;
 			size_t __id = -1;
 			std::string __metaTypeName = "<NOT SET>";
+			std::unordered_map<std::string, std::vector<std::string>> __hints;
+			std::unordered_map<std::string, std::vector<std::string>> __restrictions;
 
 		public:
 			Type(const Type& type) : __name(type.__name), __comment(type.__comment) {}
@@ -40,11 +43,15 @@ namespace sirEdit::data
 			const std::vector<Type*>& getSubTypes() const { return this->__subTypes; }
 			const size_t getID() const { return this->__id; }
 			const std::string& getMetaTypeName() const { return this->__metaTypeName; }
+			const std::unordered_map<std::string, std::vector<std::string>>& getHints() const { return this->__hints; }
+			const std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() const { return this->__restrictions; }
 			std::string& getName() { return this->__name; }
 			std::string& getComment() { return this->__comment; }
 			std::vector<Type*>& getSubTypes() { return this->__subTypes; }
 			size_t& getID() { return this->__id; }
 			std::string& getMetaTypeName() { return this->__metaTypeName; }
+			std::unordered_map<std::string, std::vector<std::string>>& getHints() { return this->__hints; }
+			std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() { return this->__restrictions; }
 	};
 	class TypeWithFields : public Type {
 		private:

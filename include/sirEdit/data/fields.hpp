@@ -34,6 +34,8 @@ namespace sirEdit::data {
 			std::string __name;
 			std::string __comment;
 			FieldType __type;
+			std::unordered_map<std::string, std::vector<std::string>> __hints;
+			std::unordered_map<std::string, std::vector<std::string>> __restrictions;
 
 		public:
 			Field() {}
@@ -42,9 +44,13 @@ namespace sirEdit::data {
 			const std::string& getName() const { return this->__name; }
 			const std::string& getComment() const { return this->__comment; }
 			const FieldType& getType() const { return this->__type; }
+			const std::unordered_map<std::string, std::vector<std::string>>& getHints() const { return this->__hints; }
+			const std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() const { return this->__restrictions; }
 			std::string& getName() { return this->__name; }
 			std::string& getComment() { return this->__comment; }
 			FieldType& getType() { return this->__type; }
+			std::unordered_map<std::string, std::vector<std::string>>& getHints() { return this->__hints; }
+			std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() { return this->__restrictions; }
 
 			std::string printType() const;
 	};
