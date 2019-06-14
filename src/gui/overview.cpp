@@ -532,9 +532,15 @@ class Overview : public Gtk::VBox {
 	public:
 		Overview(Transactions& transactions) : Gtk::VBox(), transactions(transactions) {
 			// Init Stack
+			this->stack.add(this->tool_paned, "Tool Overview", "Tool Overview");
+			this->stack.add(*Gtk::manage(new Gtk::HBox()), "Tool Relations", "Tool Relations"); // TODO: tool relations
 			this->stack_switcher.set_stack(this->stack);
-			this->pack_start(this->stack_switcher, false, true);
-			this->stack.add(this->tool_paned, "Tool Overview");
+			{
+				Gtk::Alignment* tmp = Gtk::manage(new Gtk::Alignment());
+				tmp->set(0.5, 0.5, 0, 0);
+				tmp->add(this->stack_switcher);
+				this->pack_start(*tmp, false, true);
+			}
 			this->pack_start(this->stack, true, true);
 
 			// Init layout
