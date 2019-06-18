@@ -246,7 +246,7 @@ class Overview : public Gtk::VBox {
 				bool first = true;
 				for(auto& i : this->transactions.getData().getTools()) {
 					FIELD_STATE fs = i->getFieldTransitiveState(field);
-					if(fs >= FIELD_STATE::UNUSED) {
+					if(fs > FIELD_STATE::UNUSED) {
 						if(first) {
 							first = false;
 							types->pack_start(*(createLabel(std::string(" "))), false, false);
@@ -254,9 +254,6 @@ class Overview : public Gtk::VBox {
 						}
 						const char* state;
 						switch(fs) {
-							case FIELD_STATE::UNUSED:
-								state = "UNUSED";
-								break;
 							case FIELD_STATE::READ:
 								state = "READ";
 								break;
