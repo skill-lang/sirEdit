@@ -17,10 +17,16 @@ using namespace std;
 //
 
 template<class SOURCE>
-inline std::string parseString(SOURCE* source) {
+inline std::string parseString(SOURCE* source, string spliter = "") {
 	std::string result;
-	for(int i = 0; i < source->size(); i++)
-		result += source->get(i).string->c_str();
+	bool first = true;
+	for(auto& i : *source) {
+		if(first)
+			first = false;
+		else
+			result += spliter;
+		result += *i;
+	}
 	return result;
 }
 inline std::string parseComment(sir::Comment* comment) {
@@ -29,7 +35,8 @@ inline std::string parseComment(sir::Comment* comment) {
 	auto tmp = comment->getText();
 	if(tmp == nullptr)
 		return "";
-	return parseString(tmp);
+	return parseString(tmp, " ");
+	// TODO: Tags
 }
 
 template<class FUNC>

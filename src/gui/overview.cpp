@@ -91,6 +91,186 @@ class Overview : public Gtk::VBox {
 		Gtk::TreeView field_view;
 		Glib::RefPtr<Gtk::TreeStore> field_store;
 
+		Gtk::VBox sidebar;
+
+		//
+		// Render sidebar
+		//
+
+		inline void clearSidebar() {
+			auto tmp = this->sidebar.get_children();
+			for(auto& i : tmp)
+				this->sidebar.remove(*i);
+		}
+		inline Gtk::Label* createLabel(const std::string& text) {
+			Gtk::Label* result = Gtk::manage(new Gtk::Label(text));
+			result->set_xalign(0);
+			return result;
+		};
+
+		inline void renderToolSidebar(const Tool& tool) {
+			// Create base structure
+			Gtk::VBox* typesSet;
+			Gtk::VBox* fieldsSet;
+			{
+				this->clearSidebar();
+				this->sidebar.pack_start(*(createLabel(std::string("Name: ") + tool.getName())), false, false);
+				this->sidebar.pack_start(*(createLabel(std::string("Description:\n") + tool.getDescription())), false, false);
+				this->sidebar.pack_start(*(createLabel(std::string("Command-Line:\n") + tool.getCommand())), false, false);
+				typesSet = Gtk::manage(new Gtk::VBox());
+				this->sidebar.pack_start(*typesSet, false, false);
+				fieldsSet = Gtk::manage(new Gtk::VBox());
+				this->sidebar.pack_start(*fieldsSet, false, false);
+			}
+
+			// Add types
+			{ // TODO: Sort
+				bool first = true;
+				for(auto& i : tool.getStatesTypes())
+					if(std::get<1>(i.second) >= TYPE_STATE::UNUSED) {
+						if(first) {
+							first = false;
+							typesSet->pack_start(*(createLabel(std::string(" "))), false, false);
+							typesSet->pack_start(*(createLabel(std::string("Types:"))), false, false);
+						}
+						const char* state;
+						switch(std::get<1>(i.second)) {
+							case TYPE_STATE::UNUSED:
+								state = "UNUSED";
+								break;
+							case TYPE_STATE::READ:
+								state = "READ";
+								break;
+							case TYPE_STATE::WRITE:
+								state = "WRITE";
+								break;
+							case TYPE_STATE::DELETE:
+								state = "DELETE";
+								break;
+							default:
+								throw; // That should never happen!
+						}
+						typesSet->pack_start(*(createLabel(i.first->getName() + " : " + state)), false, false);
+					}
+			}
+
+			// TODO: Fileds
+
+			this->sidebar.show_all();
+		}
+
+		template<class SOURCE>
+		inline void renderSidebarHints(const SOURCE& source, Gtk::VBox& target) {
+			// Hints
+			{
+				bool first = true;
+				for(auto& i : source.getHints()) {
+					if(first) {
+						first = false;
+						target.pack_start(*(createLabel(std::string(" "))), false, false);
+						target.pack_start(*(createLabel(std::string("Hints:"))), false, false);
+					}
+
+					std::string tmp = i.first;
+					if(i.second.size() > 0) {
+						tmp += "(";
+						bool first2 = true;
+						for(auto& j : i.second) {
+							if(first2)
+								first2 = false;
+							else
+								tmp += ", ";
+							tmp += j;
+						}
+						tmp += ")";
+					}
+					target.pack_start(*(createLabel(tmp)), false, false);
+				}
+			}
+
+			// Restrictions
+			{
+				bool first = true;
+				for(auto& i : source.getRestrictions()) {
+					if(first) {
+						first = false;
+						target.pack_start(*(createLabel(std::string(" "))), false, false);
+						target.pack_start(*(createLabel(std::string("Restrictions:"))), false, false);
+					}
+
+					std::string tmp = i.first;
+					if(i.second.size() > 0) {
+						tmp += "(";
+						bool first2 = true;
+						for(auto& j : i.second) {
+							if(first2)
+								first2 = false;
+							else
+								tmp += ", ";
+							tmp += j;
+						}
+						tmp += ")";
+					}
+					target.pack_start(*(createLabel(tmp)), false, false);
+				}
+			}
+		}
+		// TODO: Show type
+		inline void renderFieldSidebar(const Field& field) {
+			// Base structure
+			Gtk::VBox* hints;
+			Gtk::VBox* types;
+			{
+				this->clearSidebar();
+				this->sidebar.pack_start(*(createLabel(std::string("Name: ") + field.getName())), false, false);
+				this->sidebar.pack_start(*(createLabel(std::string("Description:\n") + field.getComment())), false, false);
+				this->sidebar.pack_start(*(createLabel(std::string("Type: ") + field.printType())), false, false);
+				hints = Gtk::manage(new Gtk::VBox());
+				this->sidebar.pack_start(*hints, false, false);
+				types = Gtk::manage(new Gtk::VBox());
+				this->sidebar.pack_start(*types, false, false);
+			}
+
+			// Generate hints
+			renderSidebarHints(field, *hints);
+
+			// Used in tools
+			{ // TODO: Sort
+				bool first = true;
+				for(auto& i : this->transactions.getData().getTools()) {
+					FIELD_STATE fs = i->getFieldTransitiveState(field);
+					if(fs >= FIELD_STATE::UNUSED) {
+						if(first) {
+							first = false;
+							types->pack_start(*(createLabel(std::string(" "))), false, false);
+							types->pack_start(*(createLabel(std::string("Types:"))), false, false);
+						}
+						const char* state;
+						switch(fs) {
+							case FIELD_STATE::UNUSED:
+								state = "UNUSED";
+								break;
+							case FIELD_STATE::READ:
+								state = "READ";
+								break;
+							case FIELD_STATE::WRITE:
+								state = "WRITE";
+								break;
+							case FIELD_STATE::CREATE:
+								state = "CREATE";
+								break;
+							default:
+								throw; // That should never happen!
+						}
+						types->pack_start(*(createLabel(i->getName() + " : " + state)), false, false);
+					}
+				}
+			}
+
+			// Finalize
+			this->sidebar.show_all();
+		}
+
 		//
 		// Cache
 		//
@@ -495,32 +675,9 @@ class Overview : public Gtk::VBox {
 				return;
 			blockChange = true;
 
-			// Get last selected
-			{
-				std::unordered_set<const Type*> tmp = std::move(this->getActiveTypes());
-				bool found = false;
-				const Type* foundType = nullptr;
-				for(auto& i : tmp) {
-					auto tmp2 = this->__cache_selected_type.find(i);
-					if(tmp2 == this->__cache_selected_type.end()) {
-						if(found) {
-							found = false;
-							break;
-						}
-						else {
-							found = true;
-							foundType = *i;
-						}
-					}
-				}
-				if(found)
-					this->__current_type = foundType;
-				this->__cache_selected_type = std::move(tmp);
-			}
-
 			// Update views
 			this->genCacheTools();
-			//this->genCacheTypes();
+			this->genCacheTypes();
 			this->genCacheFields();
 			this->updateToolData();
 			this->updateTypeData();
@@ -589,8 +746,9 @@ class Overview : public Gtk::VBox {
 				this->field_paned.pack1(*tmp);
 			}
 			{
-				this->field_paned.pack2(*(Gtk::manage(new Gtk::Label("TODO"))));
-				// TDOO: Sidebar
+				Gtk::ScrolledWindow* tmp = Gtk::manage(new Gtk::ScrolledWindow());
+				tmp->add(this->sidebar);
+				this->field_paned.pack2(*tmp);
 			}
 
 			// Trees
@@ -602,6 +760,11 @@ class Overview : public Gtk::VBox {
 			this->tool_view.get_selection()->signal_changed().connect([this]() -> void {
 				this->update_all();
 			});
+			this->tool_view.signal_row_activated().connect([this](const Gtk::TreeModel::Path& path, Gtk::TreeViewColumn* column) -> void {
+				const Tool* tool = (*(this->tool_store->get_iter(path)))[toolModel.data_tool];
+				if(tool != nullptr)
+					this->renderToolSidebar(*tool);
+			});
 
 			this->type_store = Gtk::TreeStore::create(typeModel);
 			this->type_view.set_model(this->type_store);
@@ -609,17 +772,15 @@ class Overview : public Gtk::VBox {
 				this->toggle_type_used(index);
 			});
 			this->type_view.get_selection()->signal_changed().connect([this]() -> void {
-				//if(!this->blockChange) {
-				//	auto tmp = this->type_view.get_selection()->get_selected_rows();
-				//	if(tmp.size() > 0)
-				//		this->changeCorrentType((*(this->type_store->get_iter(tmp[tmp.size() - 1])))[typeModel.data_type]);
-				//}
 				this->update_all();
 			});
-			//this->type_view.set_activate_on_single_click(true);
-			//this->type_view.signal_row_activated().connect([this](const Gtk::TreeModel::Path& path, Gtk::TreeViewColumn* column) -> void {
-			//	this->changeCorrentType((*(this->type_store->get_iter(path)))[typeModel.data_type]);
-			//});
+			this->type_view.signal_row_activated().connect([this](const Gtk::TreeModel::Path& path, Gtk::TreeViewColumn* column) -> void {
+				const Type* type = (*(this->type_store->get_iter(path)))[typeModel.data_type];
+				if(type != nullptr) {
+					this->__current_type = type;
+					this->update_all();
+				}
+			});
 
 			this->field_store = Gtk::TreeStore::create(fieldModel);
 			this->field_view.set_model(this->field_store);
@@ -628,6 +789,11 @@ class Overview : public Gtk::VBox {
 			});
 			this->field_view.get_selection()->signal_changed().connect([this]() -> void {
 				this->update_all();
+			});
+			this->field_view.signal_row_activated().connect([this](const Gtk::TreeModel::Path& path, Gtk::TreeViewColumn* column) -> void {
+				const Field* field = (*(this->field_store->get_iter(path)))[fieldModel.data_field];
+				if(field != nullptr)
+					this->renderFieldSidebar(*field);
 			});
 
 			// Content
