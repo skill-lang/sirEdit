@@ -11,6 +11,7 @@ class ToolModel : public Gtk::TreeModel::ColumnRecord
 {
 	public:
 		Gtk::TreeModelColumn<Glib::ustring> data_name;
+		Gtk::TreeModelColumn<Glib::ustring> data_sort_name;
 		Gtk::TreeModelColumn<bool> data_used;
 		Gtk::TreeModelColumn<bool> data_active;
 		Gtk::TreeModelColumn<Tool*> data_tool;
@@ -19,6 +20,7 @@ class ToolModel : public Gtk::TreeModel::ColumnRecord
 			this->add(data_used);
 			this->add(data_active);
 			this->add(data_name);
+			this->add(data_sort_name);
 			this->add(data_tool);
 		}
 };
@@ -28,6 +30,7 @@ class TypeModel : public Gtk::TreeModel::ColumnRecord
 {
 	public:
 		Gtk::TreeModelColumn<Glib::ustring> data_name;
+		Gtk::TreeModelColumn<Glib::ustring> data_sort_name;
 		Gtk::TreeModelColumn<bool> data_used;
 		Gtk::TreeModelColumn<bool> data_active;
 		Gtk::TreeModelColumn<Type*> data_type;
@@ -36,6 +39,7 @@ class TypeModel : public Gtk::TreeModel::ColumnRecord
 			this->add(data_used);
 			this->add(data_active);
 			this->add(data_name);
+			this->add(data_sort_name);
 			this->add(data_type);
 		}
 };
@@ -45,6 +49,7 @@ class FieldModel : public Gtk::TreeModel::ColumnRecord
 {
 	public:
 		Gtk::TreeModelColumn<Glib::ustring> data_name;
+		Gtk::TreeModelColumn<Glib::ustring> data_sort_name;
 		Gtk::TreeModelColumn<bool> data_used;
 		Gtk::TreeModelColumn<bool> data_active;
 		Gtk::TreeModelColumn<Field*> data_field;
@@ -54,6 +59,7 @@ class FieldModel : public Gtk::TreeModel::ColumnRecord
 			this->add(data_used);
 			this->add(data_active);
 			this->add(data_name);
+			this->add(data_sort_name);
 			this->add(data_field);
 			this->add(data_isUsable);
 		}
@@ -287,7 +293,8 @@ class Overview : public Gtk::VBox {
 			std::unordered_set<const Type*> result;
 			for(auto& i : this->type_view.get_selection()->get_selected_rows()) {
 				const Type* tmp = (*(this->type_store->get_iter(i)))[typeModel.data_type];
-				result.insert(tmp);
+				if(tmp != nullptr)
+					result.insert(tmp);
 			}
 			return std::move(result);
 		}
@@ -295,7 +302,8 @@ class Overview : public Gtk::VBox {
 			std::unordered_set<const Field*> result;
 			for(auto& i : this->field_view.get_selection()->get_selected_rows()) {
 				const Field* tmp = (*(this->field_store->get_iter(i)))[fieldModel.data_field];
-				result.insert(tmp);
+				if(tmp != nullptr)
+					result.insert(tmp);
 			}
 			return std::move(result);
 		}
@@ -303,7 +311,8 @@ class Overview : public Gtk::VBox {
 			this->__cache_selected_tools = {};
 			for(auto& i : this->tool_view.get_selection()->get_selected_rows()) {
 				const Tool* tmp = (*(this->tool_store->get_iter(i)))[toolModel.data_tool];
-				this->__cache_selected_tools.insert(tmp);
+				if(tmp != nullptr)
+					this->__cache_selected_tools.insert(tmp);
 			}
 		}
 		void genCacheTypes() {
@@ -472,6 +481,19 @@ class Overview : public Gtk::VBox {
 		void updateToolData() {
 			this->tool_view.get_selection()->unselect_all();
 			this->tool_store->clear();
+			this->tool_store->set_sort_column(toolModel.data_sort_name, Gtk::SortType::SORT_ASCENDING);
+
+			// Empty selection
+			{
+				auto tmp = *(this->tool_store->append());
+				tmp[toolModel.data_name] = "-- NO SELECTION --";
+				tmp[toolModel.data_sort_name] = "a";
+				tmp[toolModel.data_active] = false;
+				tmp[toolModel.data_used] = false;
+				tmp[toolModel.data_tool] = nullptr;
+			}
+
+			// Add Tools
 			for(auto& i : this->transactions.getData().getTools()) {
 				// Checks
 				if(this->hide_unused_tool.property_active().get_value() && this->__cache_used_tools.find(i) == this->__cache_used_tools.end())
@@ -482,25 +504,31 @@ class Overview : public Gtk::VBox {
 				// Insert
 				auto tmp = *(this->tool_store->append());
 				tmp[toolModel.data_name] = i->getName();
+				tmp[toolModel.data_sort_name] = "b_" + i->getName();
 				tmp[toolModel.data_active] = this->isToolActive(i);
 				tmp[toolModel.data_used] = this->__cache_used_tools.find(i) != this->__cache_used_tools.end();
 				tmp[toolModel.data_tool] = const_cast<Tool*>(i);
-				if(this->__cache_selected_tools.find(i) != this->__cache_selected_tools.end())
-					this->tool_view.get_selection()->select(tmp);
 			}
+
+			// Select tools
+			for(auto& i : this->tool_store->children())
+				if(this->__cache_selected_tools.find((*i)[toolModel.data_tool]) != this->__cache_selected_tools.end())
+					this->tool_view.get_selection()->select(i);
 		}
 
 		template<bool FIRST>
-		void __genTypeItem(Gtk::TreeStore& tree, Gtk::TreeStore::Row& row, const Type* type, std::list<Gtk::TreeStore::Path>& toSelect) {
+		void __genTypeItem(Gtk::TreeStore& tree, Gtk::TreeStore::Row& row, const Type* type) {
 			// Checks
 			if(this->hide_unused_type.property_active().get_value() && this->__cache_used_type.find(type) == this->__cache_used_type.end()) {
 				for(auto& i : type->getSubTypes())
-					this->__genTypeItem<FIRST>(tree, row, i, toSelect);
+					if(getSuper(*i) == type)
+						this->__genTypeItem<FIRST>(tree, row, i);
 				return;
 			}
 			if(this->hide_inactive_type.property_active().get_value() && !this->isTypeActive(type)) {
 				for(auto& i : type->getSubTypes())
-					this->__genTypeItem<FIRST>(tree, row, i, toSelect);
+					if(getSuper(*i) == type)
+						this->__genTypeItem<FIRST>(tree, row, i);
 				return;
 			}
 
@@ -514,14 +542,23 @@ class Overview : public Gtk::VBox {
 					ownIter = tree.append(row.children());
 			}
 			own = *ownIter;
-			own[typeModel.data_name] = type->getName();
+			own[typeModel.data_name] = type->getName() + " : " + type->getMetaTypeName();
+			own[typeModel.data_sort_name] = "b_" + type->getName();
 			own[typeModel.data_active] = this->isTypeActive(type);
 			own[typeModel.data_used] = this->__cache_used_type.find(type) != this->__cache_used_type.end();
 			own[typeModel.data_type] = const_cast<Type*>(type);
-			if(this->__cache_selected_type.find(type) != this->__cache_selected_type.end())
-				toSelect.push_back(this->type_store->get_path(ownIter));
 			for(auto& i : type->getSubTypes())
-				this->__genTypeItem<false>(tree, own, i, toSelect);
+				if(getSuper(*i) == type)
+					this->__genTypeItem<false>(tree, own, i);
+		}
+		void selectTypes(Gtk::TreeStore::iterator iter) {
+			// Check entry
+			if(this->__cache_selected_type.find((*iter)[typeModel.data_type]) != this->__cache_selected_type.end())
+				this->type_view.get_selection()->select(iter);
+
+			// Update children
+			for(auto& i : iter->children())
+				this->selectTypes(i);
 		}
 		void updateTypeData() {
 			// Get scroll bar
@@ -531,14 +568,24 @@ class Overview : public Gtk::VBox {
 			// Update entries
 			this->type_view.get_selection()->unselect_all();
 			this->type_store->clear(); // TODO: Just clear when required.
+			this->type_store->set_sort_column(typeModel.data_sort_name, Gtk::SortType::SORT_ASCENDING);
+
+			//Add empty
+			{
+				auto tmp = *(this->type_store->append());
+				tmp[typeModel.data_name] = "-- NO SELECTION --";
+				tmp[typeModel.data_sort_name] = "a";
+				tmp[typeModel.data_active] = false;
+				tmp[typeModel.data_used] = false;
+				tmp[typeModel.data_type] = nullptr;
+			}
 			{
 				Gtk::TreeStore::Row tmp;
-				std::list<Gtk::TreeStore::Path> toSelect;
 				for(auto& i : this->transactions.getData().getBaseTypes())
-					this->__genTypeItem<true>(*(this->type_store.get()), tmp, i, toSelect);
+					this->__genTypeItem<true>(*(this->type_store.get()), tmp, i);
 				this->type_view.expand_all();
-				for(auto& i : toSelect)
-					this->type_view.get_selection()->select(i);
+				for(auto& i : this->type_store->children())
+					this->selectTypes(i);
 			}
 
 			// Set scroll bar
@@ -546,7 +593,7 @@ class Overview : public Gtk::VBox {
 			this->type_scroll.get_vadjustment()->set_value(y);
 		}
 
-		Gtk::TreeStore::Path __genFieldData(const Type* type, bool required, std::list<Gtk::TreeStore::Path>& toSelect) {
+		Gtk::TreeStore::Path __genFieldData(const Type* type, bool required, Gtk::TreeStore::Path* insertInto) {
 			// Find local fields to show
 			std::list<const Field*> fields;
 			doBaseType(type, []() -> void {}, [&fields, type]() -> void {
@@ -561,8 +608,10 @@ class Overview : public Gtk::VBox {
 			// Generate class iter
 			const Type* parent = getSuper(*type);
 			Gtk::TreeStore::iterator classIter;
-			if(parent != nullptr) {
-				Gtk::TreeStore::Path parentPath = this->__genFieldData(parent, required | fields.size() > 0, toSelect);
+			if(insertInto != nullptr)
+				classIter = this->field_store->append(this->field_store->get_iter(*insertInto)->children()); // TODO: Check if is empty
+			else if(parent != nullptr) {
+				Gtk::TreeStore::Path parentPath = this->__genFieldData(parent, required | fields.size() > 0, nullptr);
 				if(!required & fields.size() == 0)
 					return {};
 				classIter = this->field_store->append(this->field_store->get_iter(parentPath)->children());
@@ -580,7 +629,14 @@ class Overview : public Gtk::VBox {
 				tmp[fieldModel.data_active] = false;
 				tmp[fieldModel.data_used] = false;
 				tmp[fieldModel.data_field] = nullptr;
-				tmp[fieldModel.data_name] = type->getName();
+				tmp[fieldModel.data_name] = type->getName() + " : " +  type->getMetaTypeName();
+				tmp[fieldModel.data_sort_name] = "b_" + type->getName();
+			}
+
+			// Add interfaces
+			for(auto& i : getInterfaces(*type)) {
+				Gtk::TreeStore::Path tmp = this->field_store->get_path(classIter);
+				this->__genFieldData(i, false, &tmp);
 			}
 
 			// Show data
@@ -590,15 +646,24 @@ class Overview : public Gtk::VBox {
 				tmp[fieldModel.data_active] = this->isFieldActive(i);
 				tmp[fieldModel.data_isUsable] = true;
 				tmp[fieldModel.data_field] = const_cast<Field*>(i);
-				tmp[fieldModel.data_name] = i->getName();
+				tmp[fieldModel.data_name] = i->getName() + " : " + i->printType();
 				tmp[fieldModel.data_used] = this->__cache_used_field.find(i) != this->__cache_used_field.end();
-
-				// was selected field?
-				if(this->__cache_selected_fields.find(i) != this->__cache_selected_fields.end())
-					toSelect.push_back(this->field_store->get_path(tmpIter));
+				tmp[fieldModel.data_sort_name] = "c_" + i->getName();
 			}
 
 			return this->field_store->get_path(classIter);
+		}
+		void selectFields(Gtk::TreeStore::iterator iter) {
+			// Update this
+			{
+				const Field* field = (*iter)[fieldModel.data_field];
+				if(this->__cache_selected_fields.find(field) != this->__cache_selected_fields.end())
+					this->field_view.get_selection()->select(iter);
+			}
+
+			// Update children
+			for(auto& i : iter->children())
+				this->selectFields(i);
 		}
 		void updateFieldData() {
 			// Get scrollbar
@@ -608,13 +673,28 @@ class Overview : public Gtk::VBox {
 			// TODO: Check filter
 			this->field_view.get_selection()->unselect_all();
 			this->field_store->clear();
+			this->field_store->set_sort_column(fieldModel.data_sort_name, Gtk::SortType::SORT_ASCENDING);
 			{
-				std::list<Gtk::TreeStore::Path> toSelect;
-				if(this->__current_type != nullptr)
-					this->__genFieldData(this->__current_type, false, toSelect);
+				// Add fiedls
+				if(this->__current_type != nullptr) {
+					// Empty slot
+					{
+						auto tmp = *(this->field_store->append());
+						tmp[fieldModel.data_active] = false;
+						tmp[fieldModel.data_isUsable] = true;
+						tmp[fieldModel.data_field] = nullptr;
+						tmp[fieldModel.data_name] = "-- NO SELECTION --";
+						tmp[fieldModel.data_used] = false;
+						tmp[fieldModel.data_sort_name] = "a";
+					}
+
+					this->__genFieldData(this->__current_type, false, nullptr);
+				}
 				this->field_view.expand_all();
-				for(auto& i : toSelect)
-					this->field_view.get_selection()->select(i);
+
+				// Select
+				for(auto& i : this->field_store->children())
+					this->selectFields(i);
 			}
 
 			// Set scrollbar

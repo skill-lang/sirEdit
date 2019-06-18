@@ -437,7 +437,7 @@ class Tab : public Gtk::HPaned
 				this->view_right.append_column("Name", fieldListModel.data_name);
 
 				// Set display options
-				this->view_right.set_search_column(fieldListModel.data_sort_name);
+				this->view_right.set_search_column(fieldListModel.data_name);
 				this->view_right.set_expander_column(*(this->view_right.get_column(5)));
 			}
 		}
