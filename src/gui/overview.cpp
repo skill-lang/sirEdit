@@ -105,6 +105,7 @@ class Overview : public Gtk::VBox {
 		inline Gtk::Label* createLabel(const std::string& text) {
 			Gtk::Label* result = Gtk::manage(new Gtk::Label(text));
 			result->set_xalign(0);
+			result->set_line_wrap(true);
 			return result;
 		};
 
@@ -545,7 +546,7 @@ class Overview : public Gtk::VBox {
 			this->type_scroll.get_vadjustment()->set_value(y);
 		}
 
-		Gtk::TreeStore::Path __genFieldData(const Type* type, bool required) {
+		Gtk::TreeStore::Path __genFieldData(const Type* type, bool required, std::list<Gtk::TreeStore::Path>& toSelect) {
 			// Find local fields to show
 			std::list<const Field*> fields;
 			doBaseType(type, []() -> void {}, [&fields, type]() -> void {
@@ -561,7 +562,7 @@ class Overview : public Gtk::VBox {
 			const Type* parent = getSuper(*type);
 			Gtk::TreeStore::iterator classIter;
 			if(parent != nullptr) {
-				Gtk::TreeStore::Path parentPath = this->__genFieldData(parent, required | fields.size() > 0);
+				Gtk::TreeStore::Path parentPath = this->__genFieldData(parent, required | fields.size() > 0, toSelect);
 				if(!required & fields.size() == 0)
 					return {};
 				classIter = this->field_store->append(this->field_store->get_iter(parentPath)->children());
@@ -584,25 +585,41 @@ class Overview : public Gtk::VBox {
 
 			// Show data
 			for(auto& i : fields) {
-				auto tmp = *(this->field_store->append(classIter->children()));
+				auto tmpIter = this->field_store->append(classIter->children());
+				auto tmp = *tmpIter;
 				tmp[fieldModel.data_active] = this->isFieldActive(i);
 				tmp[fieldModel.data_isUsable] = true;
 				tmp[fieldModel.data_field] = const_cast<Field*>(i);
 				tmp[fieldModel.data_name] = i->getName();
 				tmp[fieldModel.data_used] = this->__cache_used_field.find(i) != this->__cache_used_field.end();
+
+				// was selected field?
+				if(this->__cache_selected_fields.find(i) != this->__cache_selected_fields.end())
+					toSelect.push_back(this->field_store->get_path(tmpIter));
 			}
 
 			return this->field_store->get_path(classIter);
 		}
 		void updateFieldData() {
-			// TODO: Scrolling
-			// TODO: Keep selection
+			// Get scrollbar
+			double x = this->field_scroll.get_hadjustment()->get_value();
+			double y = this->field_scroll.get_vadjustment()->get_value();
+
 			// TODO: Check filter
 			this->field_view.get_selection()->unselect_all();
 			this->field_store->clear();
-			if(this->__current_type != nullptr)
-				this->__genFieldData(this->__current_type, false);
-			this->field_view.expand_all();
+			{
+				std::list<Gtk::TreeStore::Path> toSelect;
+				if(this->__current_type != nullptr)
+					this->__genFieldData(this->__current_type, false, toSelect);
+				this->field_view.expand_all();
+				for(auto& i : toSelect)
+					this->field_view.get_selection()->select(i);
+			}
+
+			// Set scrollbar
+			this->field_scroll.get_hadjustment()->set_value(x);
+			this->field_scroll.get_vadjustment()->set_value(y);
 		}
 
 		//
