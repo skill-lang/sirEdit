@@ -130,15 +130,25 @@ class MainWindow {
 			Gtk::Label* label = Gtk::manage(new Gtk::Label(tool.getName()));
 			Gtk::Image* closeImage = Gtk::manage(new Gtk::Image(Gtk::Stock::CLOSE, Gtk::ICON_SIZE_BUTTON));
 			Gtk::Button* closeButton = Gtk::manage(new Gtk::Button());
-			// TODO: Close tab
+			Gtk::Widget* content = createToolEdit(tool.getName(), this->__transitions);
 			closeButton->add(*closeImage);
 			closeButton->set_property("relief", Gtk::RELIEF_NONE);
+			closeButton->signal_clicked().connect([this, &tool]() -> void {
+				// Remove page
+				int tmp = this->__tabs[tool.getName()];
+				this->__notebook->remove_page(tmp);
+				this->__tabs.erase(tool.getName());
+
+				// Update tabs
+				for(auto& i : this->__tabs)
+					if(i.second >= tmp)
+						i.second--;
+			});
 			labelBox->pack_start(*label);
 			labelBox->pack_end(*closeButton);
 			labelBox->show_all();
-			Gtk::Widget* content = createToolEdit(tool.getName(), this->__transitions);
 			auto tmp = this->__notebook->append_page(*content, *labelBox);
-			this->__tabs[tool.getName()] = tmp;
+			__tabs[tool.getName()] = tmp;
 			this->__notebook->set_current_page(tmp);
 		}
 
