@@ -63,7 +63,10 @@ src_siredit_test = [
 	'src/unittests/rules/rule1.cpp',
 	'src/unittests/rules/rule2.cpp',
 	'src/unittests/rules/rule3.cpp',
-	'src/unittests/rules/rule4.cpp'
+	'src/unittests/rules/rule4.cpp',
+	'src/unittests/rules/rule5.cpp',
+	'src/unittests/rules/rule6.cpp',
+	'src/unittests/rules/rule7.cpp'
 ]
 
 # Resource encoding

@@ -158,7 +158,7 @@ namespace sirEdit::data {
 			TYPE_STATE getTypeTransitiveState(const Type& type) const {
 				// Is at least read?
 				if(!this->__hasReadSubtype(type))
-					return TYPE_STATE::NO;
+					return TYPE_STATE::UNUSED;
 
 				// Get current state
 				TYPE_STATE result = TYPE_STATE::READ;

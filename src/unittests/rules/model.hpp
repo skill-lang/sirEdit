@@ -40,7 +40,8 @@ namespace {
 					Type* super = const_cast<Type*>(getSuper(*(i.second)));
 
 					// Add to subtypes list
-					super->getSubTypes().push_back(i.second);
+					if(super != nullptr)
+						super->getSubTypes().push_back(i.second);
 				}
 
 				// TODO: Type inconsistent
@@ -86,6 +87,8 @@ namespace {
 				this->_addType(this->g);
 				this->_addType(this->h);
 				this->_addType(this->i);
+
+				this->_update();
 			}
 	};
 }
