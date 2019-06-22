@@ -38,11 +38,11 @@ namespace sirEdit::data {
 			ENUM_INSTANCE
 		};
 		META_TYPE type;
-		bool isAuto;
+		bool isAuto = false;
 		std::string customeLanguage;
 		std::string customeTypename;
 		std::unordered_map<std::string, std::vector<std::string>> customeOptions;
-		Field* view;
+		Field* view = nullptr;
 		std::vector<Field*> viewInverse; // TODO: Use it!
 	};
 	class Field {
