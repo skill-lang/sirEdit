@@ -1,8 +1,11 @@
 #pragma once
 #include <algorithm>
 #include <functional>
+#include <list>
 #include <memory>
 #include <string>
+#include <tuple>
+#include <unordered_map>
 #include <vector>
 
 #include <sirEdit/data/types.hpp>
@@ -13,9 +16,9 @@ namespace sirEdit::data {
 	class Transactions;
 	class Serializer {
 		private:
-			std::vector<Type*> types;
-			std::vector<Type*> baseTypes;
-			std::vector<Tool*> tools;
+			std::vector<Type*> __types;
+			std::vector<Type*> __baseTypes;
+			std::vector<Tool*> __tools;
 
 			void updateTypeInfo(Type* type) {
 				// Base types
@@ -24,7 +27,7 @@ namespace sirEdit::data {
 					if(tmp != nullptr)
 						tmp->getSubTypes().push_back(type);
 					else
-						this->baseTypes.push_back(type);
+						this->__baseTypes.push_back(type);
 				}
 
 				// Interfaces
@@ -36,24 +39,26 @@ namespace sirEdit::data {
 			void updateRelationships() {
 				// Get data
 				{
-					this->types.clear();
+					this->__types.clear();
 					this->getBaseTypes([this](Type* type) -> void {
-						this->types.push_back(type);
+						this->__types.push_back(type);
 						type->getSubTypes().clear();
 					});
-					this->tools.clear();
+					this->__tools.clear();
 					this->getBaseTools([this](Tool* tool) -> void {
-						this->tools.push_back(tool);
+						this->__tools.push_back(tool);
 					});
 				}
 
 				// Create new subtype information
-				for(auto& i : this->types)
+				for(auto& i : this->__types)
 					this->updateTypeInfo(i);
 			}
 
 			virtual void addBaseType(Type* type) = 0;
+			virtual void removeBaseType(Type* type) = 0;
 			virtual void addBaseTool(Tool* tool) = 0;
+			virtual void removeBaseTool(Tool* tool) = 0;
 			virtual void getBaseTypes(std::function<void(Type*)> callbackFunc) = 0;
 			virtual void getBaseTools(std::function<void(Tool*)> callbackFunc) = 0;
 		public:
@@ -61,25 +66,31 @@ namespace sirEdit::data {
 			virtual ~Serializer() {}
 
 			void addType(Type* type) {
-				this->types.push_back(type);
+				this->__types.push_back(type);
 				this->updateTypeInfo(type);
 				this->addBaseType(type);
 			}
+			void removeType(Type* type) {
+				throw; // TODO
+			}
 			void addTool(Tool* tool) {
-				this->tools.push_back(tool);
+				this->__tools.push_back(tool);
 				this->addBaseTool(tool);
+			}
+			void removeTool(Tool* tool) {
+				throw;// TODO
 			}
 			virtual void prepareSave() = 0;
 			virtual void save() = 0;
 
 			const std::vector<Type*>& getTypes() const {
-				return this->types;
+				return this->__types;
 			}
 			const std::vector<Type*>& getBaseTypes() const {
-				return this->baseTypes;
+				return this->__baseTypes;
 			}
 			const std::vector<Tool*>& getTools() const {
-				return this->tools;
+				return this->__tools;
 			}
 
 			friend Transactions;
@@ -89,8 +100,11 @@ namespace sirEdit::data {
 
 	class Transactions {
 		private:
-			Serializer& serializer;
-			std::vector<std::function<void()>> change_callback;
+			Serializer& __serializer;
+			std::list<std::tuple<std::function<void(bool)>>> __history;
+			std::unordered_map<const Tool*, std::list<uint64_t>> __tool_history;
+			uint64_t __current_history = 0;
+			std::vector<std::function<void()>> __change_callback;
 
 			template<class T>
 			inline void updateCall(T& list) {
@@ -125,20 +139,20 @@ namespace sirEdit::data {
 			}
 
 		public:
-			Transactions(Serializer& serializer) : serializer(serializer) {}
+			Transactions(Serializer& serializer) : __serializer(serializer) {}
 
 			void addChangeCallback(std::function<void()> func) {
-				this->change_callback.push_back(std::move(func));
+				this->__change_callback.push_back(std::move(func));
 			}
 
 			const Serializer& getData() const {
-				return this->serializer;
+				return this->__serializer;
 			}
 
 			const Tool* addTool(Tool tool) {
 				Tool* tmp = new Tool(std::move(tool));
-				this->serializer.addTool(tmp);
-				updateCall(this->change_callback);
+				this->__serializer.addTool(tmp);
+				updateCall(this->__change_callback);
 				return tmp;
 			}
 			void setFieldStatus(const Tool& tool, const Type& type, const Field& field, FIELD_STATE state, const std::function<void(const Type&, const Field&, FIELD_STATE, FIELD_STATE)>& callback_field, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
@@ -155,7 +169,7 @@ namespace sirEdit::data {
 				for(auto& i : field.getType().types)
 					this->updateParentTypes(tool, *i, callback_type);
 				this->updateParentTypes(tool, type, callback_type);
-				updateCall(this->change_callback);
+				updateCall(this->__change_callback);
 			}
 			void setTypeStatus(const Tool& tool, const Type& type, TYPE_STATE state, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
 				// Set type state
@@ -169,7 +183,7 @@ namespace sirEdit::data {
 					// Update sub classes
 					updateSubtypes(tool, type, callback_type);
 				}
-				updateCall(this->change_callback);
+				updateCall(this->__change_callback);
 			}
 	};
 }

@@ -418,9 +418,15 @@ namespace {
 			void addBaseType(Type* type) {
 				throw; // TODO:
 			}
+			void removeBaseType(Type* type) {
+				throw; // TODO:
+			}
 			void addBaseTool(Tool* tool) {
 				auto tmp = this->sf->Tool->add();
 				this->tools[tool] = tmp;
+			}
+			void removeBaseTool(Tool* tool) {
+				throw; // TODO:
 			}
 			void getBaseTypes(std::function<void(Type*)> callbackFunc) {
 				for(auto& i : this->types)

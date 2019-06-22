@@ -110,6 +110,42 @@ namespace sirEdit::data
 			std::vector<TypeInterface*>& getInterfaces() { return this->__interfaces; }
 			Type*& getSuper() { return this->__super; }
 	};
+	class TypeEnum : public TypeWithFields {
+		private:
+			std::vector<std::string> __instances;
+			Type* __super;
+
+		public:
+			TypeEnum(std::string name, std::string comment, std::vector<Field> fields, std::vector<std::string> instances, Type* super) : TypeWithFields(std::move(name), std::move(comment), std::move(fields)), __instances(std::move(instances)), __super(super) {
+				this->getMetaTypeName() = "ENUM";
+			}
+			TypeEnum(const Type& type, std::vector<Field> fields, std::vector<std::string> instances, Type* super) : TypeWithFields(std::move(type), std::move(fields)), __instances(std::move(instances)), __super(super) {
+				this->getMetaTypeName() = "ENUM";
+			}
+			TypeEnum(const TypeWithFields& fields, std::vector<std::string> instances, Type* super) : TypeWithFields(std::move(fields)), __instances(std::move(instances)), __super(super) {
+				this->getMetaTypeName() = "ENUM";
+			}
+
+			const std::vector<std::string>& getInterfaces() const { return this->__instances; }
+			const Type* getSuper() const { return this->__super; }
+			std::vector<std::string>& getInstances() { return this->__instances; }
+			Type*& getSuper() { return this->__super; }
+	};
+	class TypeTypedef : public Type {
+		private:
+			const Type* __reference;
+
+		public:
+			TypeTypedef(const Type& type, const Type* reference) : Type(type), __reference(reference) {
+				this->getMetaTypeName() = "TYPEDEF";
+			}
+			TypeTypedef(std::string name, std::string comment, const Type* reference) : Type(std::move(name), std::move(comment)), __reference(reference) {
+				this->getMetaTypeName() = "TYPEDEF";
+			}
+
+			const Type* getReference() const { return this->__reference; }
+			const Type*& getReference() { return this->__reference; }
+	};
 
 	template<class FUNC_BASE, class FUNC_INTERFACE, class FUNC_CLASS>
 	inline decltype((*static_cast<FUNC_BASE*>(nullptr))()) doBaseType(const Type* type, FUNC_BASE funcBase, FUNC_INTERFACE funcInterface, FUNC_CLASS funcClass) {
