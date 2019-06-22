@@ -5,9 +5,10 @@ project('sirEdit', ['cpp'],
 
 cmake = import('cmake')
 cpp = meson.get_compiler('cpp')
-openmp = cpp.find_library('gomp')
+openmp = cpp.find_library('gomp', required : false)
 cppCommon = cmake.subproject('cppCommon')
 skillLib = cppCommon.dependency('skill_cpp_common')
+gtest = dependency('gtest', main : true, required : false)
 
 thread_dep = dependency('threads')
 gtkmm = dependency('gtkmm-3.0', version: '>= 3.18')
@@ -57,6 +58,14 @@ src_siredit = [
 ]
 inc_siredit = include_directories('include')
 
+# SirEdit tests
+src_siredit_test = [
+	'src/unittests/rules/rule1.cpp',
+	'src/unittests/rules/rule2.cpp',
+	'src/unittests/rules/rule3.cpp',
+	'src/unittests/rules/rule4.cpp'
+]
+
 # Resource encoding
 resource_encoder = executable('resource_encoder', ['resource_encoder.cpp'], native: true)
 src_resources = [
@@ -71,3 +80,5 @@ src_resources = [
 ]
 
 executable('sirEdit', src_sir + src_siredit + src_resources, cpp_args: '-std=c++17', dependencies: [gtkmm, skillLib, openmp, thread_dep], include_directories: [inc_sir, inc_siredit], install: true)
+sirEdit_test = executable('sirEdit_test', src_siredit_test, cpp_args: '-std=c++17', dependencies: [openmp, gtest], include_directories: [inc_siredit])
+test('sirEdit tests', sirEdit_test)
