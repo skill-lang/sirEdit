@@ -18,90 +18,244 @@ namespace sirEdit::data {
 			std::unordered_map<const Type*, std::tuple<uint64_t, TYPE_STATE>> __statesType;
 
 			//
-			// Cache for deep search of type
+			// Calc transetive states
 			//
-			mutable std::unordered_map<const Type*, bool> __cacheTransitiveType;
-			std::unordered_map<const Type*, uint64_t> __setTypeFields;
-			bool __hasReadSubtype(const Type& type) const {
-				// Test cache
+			mutable std::unordered_map<const Field*, FIELD_STATE> __cache_fields; /// Cache for fields
+			mutable std::unordered_map<const Type*, bool> __cache_types_delete; /// Cache delete state for types
+			mutable std::unordered_map<const Type*, TYPE_STATE> __cache_types;  /// Cache state of types
+
+			/**
+			 * Calculate the transitive state of a field.
+			 * @param field the field to calculate
+			 * @return state of the field
+			 */
+			FIELD_STATE __transField(const Field* field) const {
+				// Cache hit?
 				{
-					auto tmp = this->__cacheTransitiveType.find(&type);
-					if(tmp != this->__cacheTransitiveType.end())
+					auto tmp = this->__cache_fields.find(field);
+					if(tmp != this->__cache_fields.end())
 						return tmp->second;
 				}
 
-				// Test self
+				// New result
+				FIELD_STATE result = FIELD_STATE::UNUSED;
+
+				// Check if value is set
 				{
-					auto tmp = this->__statesType.find(&type);
-					if((tmp != this->__statesType.end()) && (std::get<0>(tmp->second) > 0 || std::get<1>(tmp->second) >= TYPE_STATE::READ)) {
-						this->__cacheTransitiveType[&type] = true;
-						return true;
+					auto tmpField = this->__statesFields.find(field);
+					if(tmpField != this->__statesFields.end()) {
+						for(auto& i : tmpField->second)
+							result = std::max(result, i.second);
 					}
 				}
 
-				// Test subtypes
-				for(auto& i : type.getSubTypes())
-					if(this->__hasReadSubtype(*i)) {
-						this->__cacheTransitiveType[&type] = true;
-						return true;
-					}
+				// Check views
+				for(auto& i : field->getMeta().viewInverse)
+					result = std::max(result, this->__transField(i));
 
-				// Test fields
-				{
-					auto tmp = this->__setTypeFields.find(&type);
-					if(tmp != this->__setTypeFields.end() && tmp->second > 0) {
-						this->__cacheTransitiveType[&type] = true;
-						return true;
-					}
-				}
-
-				// Not found
-				this->__cacheTransitiveType[&type] = false;
-				return false;
+				// Add to cache and return
+				this->__cache_fields[field] = result;
+				return result;
 			}
 
-			inline void __setField(const Field& field) {
-				for(auto& i : field.getType().types) {
-					// Set state
-					auto tmp = this->__setTypeFields.find(i);
-					if(tmp == this->__setTypeFields.end())
-						this->__setTypeFields[i] = 1;
-					else
-						this->__setTypeFields[i]++;
-
-					// Clean cache
-					this->__cleanCacheType(*i);
+			/**
+			 * Calculating if a type is transetive to deleted
+			 * @param type the type to check
+			 * @return is type recusive set to deleted
+			 */
+			bool __isDelete(const Type* type) const {
+				// Cache hit?
+				{
+					auto tmp = this->__cache_types_delete.find(type);
+					if(tmp != this->__cache_types_delete.end())
+						return tmp->second;
 				}
+
+				// Calculating result, init
+				bool result = false;
+
+				// Check if type is self set
+				{
+					auto tmp = this->__statesType.find(type);
+					if(tmp != this->__statesType.end())
+						if(std::get<1>(tmp->second) == TYPE_STATE::DELETE)
+							result |= true;
+				}
+
+				// Check super type
+				if(!result) {
+					const Type* super = getSuper(*type);
+					if(super != nullptr)
+						result |= this->__isDelete(super);
+				}
+
+				// Check interfaces
+				if(!result) {
+					auto& interfaces = getInterfaces(*type);
+					for(auto& i : interfaces) {
+						result |= this->__isDelete(i);
+						if(result) // Speedup
+							break;
+					}
+				}
+
+				// Cache result and return
+				this->__cache_types_delete[type] = result;
+				return result;
 			}
-			inline void __unsetField(const Field& field) {
-				for(auto& i : field.getType().types) {
-					// Unset
-					this->__setTypeFields[i]--;
 
-					// Clean cache
-					this->__cleanCacheType(*i);
+			/**
+			 * Calculates the transitive state of a type
+			 * @param type the type to calculate
+			 * @return state of the type
+			 */
+			TYPE_STATE __transType(const Type* type) const {
+				// Cache hit?
+				{
+					auto tmp = this->__cache_types.find(type);
+					if(tmp != this->__cache_types.end())
+						return tmp->second;
 				}
+
+				// Calculating new result, init
+				TYPE_STATE result = TYPE_STATE::UNUSED;
+
+				// Check if state is set and field or refernce from a field is given
+				{
+					auto tmp = this->__statesType.find(type);
+					if(tmp != this->__statesType.end()) {
+						result = std::max(result, std::get<1>(tmp->second));
+						if(std::get<0>(tmp->second))
+							result = std::max(result, TYPE_STATE::READ);
+					}
+				}
+
+				// Check if own fields are set on created -> set type to write
+				for(auto& i : getFields(*type)) {
+					FIELD_STATE tmp = this->__transField(&i);
+					if(tmp == FIELD_STATE::CREATE)
+						result = std::max(result, TYPE_STATE::WRITE);
+					else if(tmp >= FIELD_STATE::READ)
+						result = std::max(result, TYPE_STATE::READ);
+
+					if(result >= TYPE_STATE::WRITE) // Speedup
+						break;
+				}
+
+				// Check if a subtypes are set to >= read
+				if(result < TYPE_STATE::READ) { // Speedup
+					for(auto& i : type->getSubTypes())
+						if(this->__transType(i) >= TYPE_STATE::READ) {
+							result = std::max(result, TYPE_STATE::READ);
+							if(result >= TYPE_STATE::READ)
+								break;
+						}
+				}
+
+				// Check if supertype is set to delete
+				if(result < TYPE_STATE::DELETE) // Speedup
+					if(this->__isDelete(type))
+						result = std::max(result, TYPE_STATE::DELETE);
+
+				// Cache and return
+				this->__cache_types[type] = result;
+				return result;
 			}
 
 			//
-			// Helper
+			// Cache cleaner
 			//
-			void __cleanCacheType(const Type& type) {
-				// Clear deep search cache
+			/**
+			 * Clear the caches of a type
+			 * @param type the type witches caches should be reseted
+			 */
+			void __clearTypeCache(const Type* type) const {
+				// Clear own
 				{
-					const Type* current = &type;
-					while(current != nullptr) {
-						 // Remove current
-						auto tmp = this->__cacheTransitiveType.find(current);
-						if(tmp != this->__cacheTransitiveType.end())
-							this->__cacheTransitiveType.erase(tmp);
-
-						// Do interfaces
-						for(auto& i : getInterfaces(*current))
-							this->__cleanCacheType(*i);
-						current = getSuper(*current);
-					}
+					auto tmp1 = this->__cache_types.find(type);
+					auto tmp2 = this->__cache_types_delete.find(type);
+					if(tmp1 != this->__cache_types.end())
+						this->__cache_types.erase(tmp1);
+					if(tmp2 != this->__cache_types_delete.end())
+						this->__cache_types_delete.erase(tmp2);
 				}
+
+				// Clear supertype
+				{
+					auto super = getSuper(*type);
+					if(super != nullptr)
+						this->__clearTypeCache(super);
+				}
+
+				// Clear interfaces
+				{
+					auto& interfaces = getInterfaces(*type);
+					for(auto& i : interfaces)
+						this->__clearTypeCache(i);
+				}
+			}
+
+			/**
+			 * Clears the cache of a field
+			 * IMPORTANT: When jou change a field definition you have to clear the type, in which you changed the field defition on your own!
+			 * @param field the field of witch the caches get reseted
+			 */
+			void __clearFieldCache(const Field* field) const {
+				// Clear own
+				{
+					auto tmp = this->__cache_fields.find(field);
+					if(tmp != this->__cache_fields.end())
+						this->__cache_fields.erase(tmp);
+				}
+
+				// Clear view
+				if(field->getMeta().view != nullptr)
+					this->__clearFieldCache(field->getMeta().view);
+
+				// Clear referenced types
+				for(auto& i : field->getType().types)
+					this->__clearTypeCache(i);
+			}
+
+			//
+			// Helper for updating referenced types in field
+			//
+			/**
+			 * Increase referenced types of a field.
+			 * @param field the field witch refernces the types
+			 */
+			void __incFieldRefernces(const Field* field) {
+				// Update referenced types
+				for(auto& i : field->getType().types) {
+					auto tmp = this->__statesType.find(i);
+					if(tmp == this->__statesType.end()) {
+						this->__statesType[i] = {0, TYPE_STATE::NO};
+						tmp = this->__statesType.find(i);
+					}
+					std::get<0>(tmp->second) += 1;
+				}
+
+				// Update views
+				if(field->getMeta().view != nullptr)
+					this->__incFieldRefernces(field->getMeta().view);
+			}
+
+			/**
+			 * Decrement the referenced types of a field.
+			 * @param field the field witch references should be decremented
+			 */
+			void __decFieldReferences(const Field* field) {
+				// Update referenced types
+				for(auto& i : field->getType().types) {
+					auto tmp = this->__statesType.find(i);
+					if(tmp == this->__statesType.end())
+						throw; // That should never happen!
+					std::get<0>(tmp->second) -= 1;
+				}
+
+				// Update views
+				if(field->getMeta().view != nullptr)
+					this->__decFieldReferences(field->getMeta().view);
 			}
 
 		public:
@@ -136,16 +290,7 @@ namespace sirEdit::data {
 					return tmp_type->second;
 			}
 			FIELD_STATE getFieldTransitiveState(const Field& field) const {
-				// Search field
-				auto tmp = this->__statesFields.find(&field);
-				if(tmp == this->__statesFields.end())
-					return FIELD_STATE::UNUSED;
-
-				// Compute max
-				FIELD_STATE result = FIELD_STATE::UNUSED;
-				for(auto& i : tmp->second)
-					result = std::max(result, i.second);
-				return result;
+				return this->__transField(&field);
 			}
 			TYPE_STATE getTypeSetState(const Type& type) const {
 				// Search type
@@ -156,36 +301,7 @@ namespace sirEdit::data {
 					return std::get<1>(tmp->second);
 			}
 			TYPE_STATE getTypeTransitiveState(const Type& type) const {
-				// Is at least read?
-				if(!this->__hasReadSubtype(type))
-					return TYPE_STATE::UNUSED;
-
-				// Get current state
-				TYPE_STATE result = TYPE_STATE::READ;
-				{
-					// Check if field gets created
-					for(auto& i : getFields(type))
-						if(this->getFieldTransitiveState(i) == FIELD_STATE::CREATE)
-							result = std::max(TYPE_STATE::WRITE, result);
-
-					// Get set state
-					auto tmp = this->__statesType.find(&type);
-					if(tmp != this->__statesType.end())
-						result = std::max(std::get<1>(tmp->second), result);
-				}
-
-				// Check for parents delete
-				{
-					const Type* current = getSuper(type);
-					while(current != nullptr) {
-						auto tmp = this->__statesType.find(current);
-						if((tmp != this->__statesType.end()) && (std::get<1>(tmp->second) == TYPE_STATE::DELETE))
-							return TYPE_STATE::DELETE;
-						current = getSuper(*current);
-					}
-				}
-
-				return result;
+				return this->__transType(&type);
 			}
 
 			//
@@ -193,7 +309,8 @@ namespace sirEdit::data {
 			//
 			void setFieldState(const Type& type, const Field& field, FIELD_STATE state) {
 				// Clear caches
-				this->__cleanCacheType(type);
+				this->__clearTypeCache(&type);
+				this->__clearFieldCache(&field);
 
 				// Set state
 				FIELD_STATE old = this->getFieldSetState(field, type);
@@ -213,35 +330,40 @@ namespace sirEdit::data {
 					}
 
 					// Activate field
-					if(state >= FIELD_STATE::READ && tmp2->second <= FIELD_STATE::UNUSED)
-						this->__setField(field);
-					else if(state <= FIELD_STATE::UNUSED && tmp2->second >= FIELD_STATE::READ)
-						this->__unsetField(field);
-
-					tmp->second[&type] = state;
+					tmp2->second = state;
 				}
 
 				// Update type info
-				if(old <= FIELD_STATE::UNUSED & state >= FIELD_STATE::READ) {
+				if(old <= FIELD_STATE::UNUSED && state >= FIELD_STATE::READ) {
 					// Increase type
-					auto tmp = this->__statesType.find(&type);
-					if(tmp == this->__statesType.end()) {
-						this->__statesType[&type] = {0, TYPE_STATE::NO};
-						tmp = this->__statesType.find(&type);
+					{
+						auto tmp = this->__statesType.find(&type);
+						if(tmp == this->__statesType.end()) {
+							this->__statesType[&type] = {0, TYPE_STATE::NO};
+							tmp = this->__statesType.find(&type);
+						}
+						std::get<0>(tmp->second) += 1;
 					}
-					std::get<0>(tmp->second)++;
+
+					// Increase referenced fields
+					this->__incFieldRefernces(&field);
 				}
-				else if(old >= FIELD_STATE::READ & state <= FIELD_STATE::UNUSED) {
+				else if(old >= FIELD_STATE::READ && state <= FIELD_STATE::UNUSED) {
 					// Decrease type
-					auto tmp = this->__statesType.find(&type);
-					if(tmp == this->__statesType.end())
-						throw; // This should NEVER happen!
-					std::get<0>(tmp->second)--;
+					{
+						auto tmp = this->__statesType.find(&type);
+						if(tmp == this->__statesType.end())
+							throw; // This should NEVER happen!
+						std::get<0>(tmp->second) -= 1;
+					}
+
+					// Decrease referenced fields
+					this->__decFieldReferences(&field);
 				}
 			}
 			void setTypeState(const Type& type, TYPE_STATE state) {
 				// Clear cache
-				this->__cleanCacheType(type);
+				this->__clearTypeCache(&type);
 
 				// Set state
 				{
