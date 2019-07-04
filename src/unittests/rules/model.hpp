@@ -44,6 +44,11 @@ namespace {
 						super->getSubTypes().push_back(i.second);
 				}
 
+				// Update interfaces
+				for(auto& i : this->__types)
+					for(auto& j : getInterfaces(*(i.second)))
+						j->getSubTypes().push_back(i.second);
+
 				// TODO: Type inconsistent
 				// TODO: Fields
 			}
