@@ -64,11 +64,8 @@ namespace {
 	 * ^       ^
 	 * |       |
 	 * c(i) <- d(c) <- e(c)
-	 *         ^
-	 *         |
-	 *         f(td)
 	 *
-	 * i(c)
+	 * i(c) <- f(td)
 	 */
 	class TypeTestModel1 : ModelHelper {
 		public:
