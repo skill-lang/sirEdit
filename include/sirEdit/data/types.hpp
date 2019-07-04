@@ -147,12 +147,16 @@ namespace sirEdit::data
 			const Type*& getReference() { return this->__reference; }
 	};
 
-	template<class FUNC_BASE, class FUNC_INTERFACE, class FUNC_CLASS>
-	inline decltype((*static_cast<FUNC_BASE*>(nullptr))()) doBaseType(const Type* type, FUNC_BASE funcBase, FUNC_INTERFACE funcInterface, FUNC_CLASS funcClass) {
+	template<class FUNC_BASE, class FUNC_INTERFACE, class FUNC_CLASS, class FUNC_ENUM, class FUNC_TYPEDEF>
+	inline decltype((*static_cast<FUNC_BASE*>(nullptr))()) doBaseType(const Type* type, FUNC_BASE funcBase, FUNC_INTERFACE funcInterface, FUNC_CLASS funcClass, FUNC_ENUM funcEnum, FUNC_TYPEDEF funcTypedef) {
 		if(dynamic_cast<const TypeInterface*>(type) != nullptr)
 			return funcInterface();
 		else if(dynamic_cast<const TypeClass*>(type) != nullptr)
 			return funcClass();
+		else if(dynamic_cast<const TypeEnum*>(type) != nullptr)
+			return funcEnum();
+		else if(dynamic_cast<const TypeTypedef*>(type) != nullptr)
+			return funcTypedef();
 		else
 			return funcBase();
 	}
@@ -160,19 +164,21 @@ namespace sirEdit::data
 	inline Type::operator TypeWithFields*() {
 		auto withFields = [this]() -> TypeWithFields* { return dynamic_cast<TypeWithFields*>(this); };
 		auto withoutFields = []() -> TypeWithFields* { return nullptr; };
-		return doBaseType(this, withoutFields, withFields, withFields);
+		return doBaseType(this, withoutFields, withFields, withFields, withFields, withoutFields);
 	}
 	inline Type::operator const TypeWithFields*() const {
 		auto withFields = [this]() -> const TypeWithFields* { return dynamic_cast<const TypeWithFields*>(this); };
 		auto withoutFields = []() -> const TypeWithFields* { return nullptr; };
-		return doBaseType(this, withoutFields, withFields, withFields);
+		return doBaseType(this, withoutFields, withFields, withFields, withFields, withoutFields);
 	}
 
 	inline const Type* getSuper(const Type& type) {
 		auto isBase = []() -> const Type* { return nullptr; };
 		auto isInterface = [&type]() -> const Type* { return dynamic_cast<const TypeInterface*>(&type)->getSuper(); };
 		auto isClass = [&type]() -> const Type* { return dynamic_cast<const TypeClass*>(&type)->getSuper(); };
-		return doBaseType(&type, isBase, isInterface, isClass);
+		auto isEnum = [&type]() -> const Type* { return dynamic_cast<const TypeEnum*>(&type)->getSuper(); };
+		auto isTypedef = [&type]() -> const Type* { return dynamic_cast<const TypeTypedef*>(&type)->getReference(); };
+		return doBaseType(&type, isBase, isInterface, isClass, isEnum, isTypedef);
 	}
 
 	static const std::vector<TypeInterface*> __getInterfacesEmpty;
@@ -180,7 +186,7 @@ namespace sirEdit::data
 		auto isBase = []() -> const std::vector<TypeInterface*>& { return __getInterfacesEmpty; };
 		auto isInterface = [&type]() -> const std::vector<TypeInterface*>& { return dynamic_cast<const TypeInterface*>(&type)->getInterfaces(); };
 		auto isClass = [&type]() -> const std::vector<TypeInterface*>& { return dynamic_cast<const TypeClass*>(&type)->getInterfaces(); };
-		return doBaseType(&type, isBase, isInterface, isClass);
+		return doBaseType(&type, isBase, isInterface, isClass, isBase, isBase);
 	}
 
 	static const std::vector<Field> __getFieldsEmpty;
@@ -188,7 +194,8 @@ namespace sirEdit::data
 		auto isBase = []() -> const std::vector<Field>& { return __getFieldsEmpty; };
 		auto isInterface = [&type]() -> const std::vector<Field>& { return dynamic_cast<const TypeInterface*>(&type)->getFields(); };
 		auto isClass = [&type]() -> const std::vector<Field>& { return dynamic_cast<const TypeClass*>(&type)->getFields(); };
-		return doBaseType(&type, isBase, isInterface, isClass);
+		auto isEnum = [&type]() -> const std::vector<Field>& { return dynamic_cast<const TypeEnum*>(&type)->getFields(); };
+		return doBaseType(&type, isBase, isInterface, isClass, isEnum, isBase);
 	}
 
 	inline std::string Field::printType() const {

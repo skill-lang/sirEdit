@@ -66,7 +66,7 @@ TEST(rule_7, IndirectInterface) {
 	TypeTestModel1 model;
 	Tool t;
 
-	// Set state test for b
+	// Set state test for d
 	t.setTypeState(model.d, TYPE_STATE::READ);
 	EXPECT_EQ(t.getTypeTransitiveState(model.d), TYPE_STATE::READ);
 	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::READ);
@@ -80,5 +80,43 @@ TEST(rule_7, IndirectInterface) {
 	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::UNUSED);
 	EXPECT_EQ(t.getTypeTransitiveState(model.b), TYPE_STATE::UNUSED);
 	EXPECT_EQ(t.getTypeTransitiveState(model.c), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::UNUSED);
+}
+
+TEST(rule_7, TypeDeklartion) {
+	// Values
+	TypeTestModel1 model;
+	Tool t;
+
+	// Set state test for f
+	t.setTypeState(model.f, TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.f), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::READ);
+
+	// Reset
+	t.setTypeState(model.f, TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.f), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::UNUSED);
+}
+
+TEST(rule_7, Enum) {
+	// Values
+	TypeTestModel1 model;
+	Tool t;
+
+	// Set state test for f
+	t.setTypeState(model.h, TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.g), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.h), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::UNUSED);
+
+	// Reset
+	t.setTypeState(model.h, TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.g), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.h), TYPE_STATE::UNUSED);
 	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::UNUSED);
 }

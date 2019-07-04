@@ -262,7 +262,7 @@ inline void addInterfaces(Type& type, unordered_map<Type*, sir::Type*>& types, u
 		_addInterfacesHelper<TypeInterface, sir::InterfaceType>(dynamic_cast<TypeInterface*>(&type), types, typeInverse);
 	}, [&type, &types, &typeInverse]() -> void {
 		_addInterfacesHelper<TypeClass, sir::ClassType>(dynamic_cast<TypeClass*>(&type), types, typeInverse);
-	});
+	}, []() -> void {}, []() -> void {});
 }
 
 namespace {

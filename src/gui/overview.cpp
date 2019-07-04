@@ -592,15 +592,7 @@ class Overview : public Gtk::VBox {
 
 		Gtk::TreeStore::Path __genFieldData(const Type* type, bool required, Gtk::TreeStore::Path* insertInto) {
 			// Find local fields to show
-			std::list<const Field*> fields;
-			doBaseType(type, []() -> void {}, [&fields, type]() -> void {
-				for(auto& i : dynamic_cast<const TypeInterface*>(type)->getFields())
-					fields.push_back(&i);
-			}, [&fields, type]() -> void {
-				for(auto& i : dynamic_cast<const TypeClass*>(type)->getFields()) {
-					fields.push_back(&i);
-				}
-			});
+			auto fields = getFields(*type);
 
 			// Generate class iter
 			const Type* parent = getSuper(*type);
@@ -640,12 +632,12 @@ class Overview : public Gtk::VBox {
 			for(auto& i : fields) {
 				auto tmpIter = this->field_store->append(classIter->children());
 				auto tmp = *tmpIter;
-				tmp[fieldModel.data_active] = this->isFieldActive(i);
+				tmp[fieldModel.data_active] = this->isFieldActive(&i);
 				tmp[fieldModel.data_isUsable] = true;
-				tmp[fieldModel.data_field] = const_cast<Field*>(i);
-				tmp[fieldModel.data_name] = i->getName() + " : " + i->printType();
-				tmp[fieldModel.data_used] = this->__cache_used_field.find(i) != this->__cache_used_field.end();
-				tmp[fieldModel.data_sort_name] = "c_" + i->getName();
+				tmp[fieldModel.data_field] = &i;
+				tmp[fieldModel.data_name] = i.getName() + " : " + i.printType();
+				tmp[fieldModel.data_used] = this->__cache_used_field.find(&i) != this->__cache_used_field.end();
+				tmp[fieldModel.data_sort_name] = "c_" + i.getName();
 			}
 
 			return this->field_store->get_path(classIter);
