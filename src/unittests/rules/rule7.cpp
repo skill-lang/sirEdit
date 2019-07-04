@@ -60,3 +60,25 @@ TEST(rule_7, DirectInterface) {
 	EXPECT_EQ(t.getTypeTransitiveState(model.c), TYPE_STATE::UNUSED);
 	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::UNUSED);
 }
+
+TEST(rule_7, IndirectInterface) {
+	// Values
+	TypeTestModel1 model;
+	Tool t;
+
+	// Set state test for b
+	t.setTypeState(model.d, TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.d), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.b), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.c), TYPE_STATE::READ);
+	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::UNUSED);
+
+	// Reset
+	t.setTypeState(model.d, TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.d), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.a), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.b), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.c), TYPE_STATE::UNUSED);
+	EXPECT_EQ(t.getTypeTransitiveState(model.i), TYPE_STATE::UNUSED);
+}
