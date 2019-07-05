@@ -374,5 +374,22 @@ namespace sirEdit::data {
 						std::get<1>(tmp->second) = state;
 				}
 			}
+
+			std::string parseCMD() const {
+				std::string result = this->getCommand();
+				size_t current = 0;
+				while(true) {
+					size_t tmp = this->getCommand().find("$CODEGEN", current);
+					if(tmp == std::string::npos) {
+						result += this->getCommand().substr(current, this->getCommand().size() - current);
+						break;
+					}
+					else {
+						result += this->getCommand().substr(current, tmp - current) + "java -jar codegen.jar";
+						current = tmp + 8;
+					}
+				}
+				return result;
+			}
 	};
 }
