@@ -49,6 +49,8 @@ inc_sir = include_directories('sir')
 # SirEdit files
 src_siredit = [
 	'src/main.cpp',
+	'src/runCodegen.cpp',
+	'src/data/includeSearch.cpp',
 	'src/data/serializeSIR.cpp',
 	'src/gui/loadFile.cpp',
 	'src/gui/mainWindow.cpp',
@@ -79,7 +81,11 @@ src_resources = [
 	custom_target('mainWindow.glade',
 	              input: ['data/gui/mainWindow.glade'],
 	              output: ['tmpres_mainWindow_glade.cpp'],
-	              command: [resource_encoder, '@INPUT0@', '@OUTPUT0@', 'sirEdit_mainWindow_glade'])
+	              command: [resource_encoder, '@INPUT0@', '@OUTPUT0@', 'sirEdit_mainWindow_glade']),
+	custom_target('codegen.jar',
+	              input: ['data/codegen.jar'],
+	              output: ['tmpres_sirEdit_codegen.cpp'],
+	              command: [resource_encoder, '@INPUT0@', '@OUTPUT0@', 'sirEdit_codegen'])
 ]
 
 executable('sirEdit', src_sir + src_siredit + src_resources, cpp_args: '-std=c++17', dependencies: [gtkmm, skillLib, openmp, thread_dep], include_directories: [inc_sir, inc_siredit], install: true)

@@ -1,9 +1,13 @@
 #include <gtkmm.h>
 #include <sirEdit/main.hpp>
+#include <sirEdit/data/skillInclude.hpp>
+#include <cstdio>
+#include <sstream>
+#include <fstream>
+#include "startupWindow.hpp"
+
 
 extern std::string sirEdit_startupWindow_glade;
-
-#include "startupWindow.hpp"
 
 // INFO: Hack to to protect crashes after main program
 static Glib::RefPtr<Gtk::Builder>* _startUpBuild = new Glib::RefPtr<Gtk::Builder>();
@@ -17,11 +21,11 @@ extern void sirEdit::gui::runStartupWindow() {
 		startUpBuild = Gtk::Builder::create_from_string(sirEdit_startupWindow_glade);
 
 	// Window
-	Gtk::ApplicationWindow* window;
+	Gtk::ApplicationWindow* awindow;
 	{
-		startUpBuild->get_widget("StartupWindow", window);
-		window->show_all();
-		sirEdit::mainApplication->add_window(*window);
+		startUpBuild->get_widget("StartupWindow", awindow);
+		awindow->show_all();
+		sirEdit::mainApplication->add_window(*awindow);
 	}
 
 	// Settings
@@ -69,30 +73,87 @@ extern void sirEdit::gui::runStartupWindow() {
 		Gtk::Button* doImport;
 		Gtk::ApplicationWindow* window;
 		Gtk::FileChooserButton* importFile;
+		Gtk::FileChooserButton* importFolder;
 		startUpBuild->get_widget("ImportSKILL", button);
 		startUpBuild->get_widget("doImport", doImport);
 		startUpBuild->get_widget("ImportSKilLWindow", window);
 		startUpBuild->get_widget("importFile", importFile);
+		startUpBuild->get_widget("importFolder", importFolder);
 
 		// Activation button
-		button->signal_clicked().connect([window]() -> void {
+		button->signal_clicked().connect([window, doImport, importFile, importFolder]() -> void {
 			window->show_all();
-		});
 
-		// Set properties
-		doImport->set_sensitive(false);
-		importFile->set_sensitive(false);
+			// Set properties
+			doImport->set_sensitive(false);
+			importFile->set_sensitive(false);
+		});
+		importFolder->signal_file_set().connect([importFile, doImport]()-> void {
+			importFile->set_sensitive(true);
+			doImport->set_sensitive(false);
+		});
+		importFile->signal_file_set().connect([doImport]()-> void {
+			doImport->set_sensitive(true);
+		});
+		doImport->signal_clicked().connect([importFolder, importFile, window, awindow
+]() -> void {
+			// Prepare
+			std::string folderName = tmpnam(nullptr);
+			data::SKilL_Include inc(folderName);
+			mkdir(folderName.c_str(), 0777);
+
+			// Download files
+			try {
+				inc.parse(importFile->get_filename(), [importFolder](std::string file) -> std::string {
+					auto ioRemote = importFolder->get_file()->get_child(file)->read();
+					std::stringstream tmp;
+					char buffer[256];
+					int readed;
+					while((readed = ioRemote->read(buffer, 256)) != 0)
+						tmp.write(buffer, readed);
+					ioRemote->close();
+					return tmp.str();
+				});
+				inc.convert(importFile->get_filename());
+			}
+			catch(...) {
+				Gtk::MessageDialog* md = Gtk::manage(new Gtk::MessageDialog("Import was not possible."));
+				md->show_all();
+				return;
+			}
+
+			// User should save the file
+			auto chooser = Gtk::FileChooserNative::create("SIR-Files", *window, Gtk::FILE_CHOOSER_ACTION_SAVE);
+			switch(chooser->run()) {
+				case Gtk::RESPONSE_ACCEPT:
+					// Copy file
+					{
+						char buffer[256];
+						int readed;
+						std::ifstream inLocal(folderName + "/spec.sir", std::ios::in | std::ios::binary);
+						auto tmp = chooser->get_file()->replace();
+						while((readed = inLocal.readsome(buffer, 256)) != 0)
+							tmp->write(buffer, readed);
+						tmp->close();
+					}
+
+					// Open main window
+					window->close();
+					sirEdit::loadFile(awindow, chooser.get());
+					break;
+			}
+		});
 	}
 
 	// Open sir file
 	{
 		Gtk::Button* button;
 		startUpBuild->get_widget("OpenSir", button);
-		button->signal_clicked().connect([window]() -> void {
-			auto chooser = Gtk::FileChooserNative::create("SIR-Files", *window, Gtk::FILE_CHOOSER_ACTION_OPEN);
+		button->signal_clicked().connect([awindow]() -> void {
+			auto chooser = Gtk::FileChooserNative::create("SIR-Files", *awindow, Gtk::FILE_CHOOSER_ACTION_OPEN);
 			switch(chooser->run()) {
 				case Gtk::RESPONSE_ACCEPT:
-					sirEdit::loadFile(window, chooser.get());
+					sirEdit::loadFile(awindow, chooser.get());
 					break;
 			}
 		});
