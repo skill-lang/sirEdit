@@ -375,7 +375,12 @@ namespace sirEdit::data {
 				}
 			}
 
-			std::string parseCMD() const {
+			/**
+			 * Generates the command line command.
+			 * @param spec the filename of the specification
+			 * @return commands to run
+			 */
+			std::string parseCMD(std::string spec) const {
 				std::string result = this->getCommand();
 				size_t current = 0;
 				while(true) {
@@ -385,7 +390,7 @@ namespace sirEdit::data {
 						break;
 					}
 					else {
-						result += this->getCommand().substr(current, tmp - current) + "java -jar codegen.jar";
+						result += this->getCommand().substr(current, tmp - current) + "java -jar codegen.jar " + spec;
 						current = tmp + 8;
 					}
 				}
