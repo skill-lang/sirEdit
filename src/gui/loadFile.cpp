@@ -3,6 +3,7 @@
 #include <atomic>
 #include <future>
 #include <iostream>
+#include <thread>
 #include <sirEdit/main.hpp>
 #include <sirEdit/data/serialize.hpp>
 
@@ -12,12 +13,18 @@
 
 using namespace std;
 
+extern volatile bool ended;
+
 static thread* _loader_thread = new thread();
 static thread& loader_thread = *_loader_thread;
 
 static Glib::RefPtr<Gio::File> outputFile;
 static std::string filePath;
 static sirEdit::data::Serializer* ser;
+
+std::string sirEdit::getSavePath() {
+	return outputFile->get_parent()->get_path();
+}
 
 void sirEdit::doSave(bool blocking) {
 	// Save function
@@ -86,7 +93,15 @@ inline void loadFileThread(Gtk::Window* mainWindow, Gtk::Window* popup, Glib::Re
 }
 
 extern void sirEdit::loadFile(Gtk::Window* window, Gtk::FileChooserNative* chooser) {
-	// TODO: Popup info
+	// Autosave
+	new thread([]() -> void {
+		if(ended)
+			return;
+		runInGui([]() -> void {
+			doSave(false);
+		});
+		sleep(30);
+	});
 
 	// Start loader
 	auto files = chooser->get_files();

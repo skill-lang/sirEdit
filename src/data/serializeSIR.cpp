@@ -278,7 +278,9 @@ namespace {
 
 			list<Tool*> toAdd;
 			list<sir::Tool*> toRemove;
+			list<Type*> addType;
 
+			list<Type*> saveAddType;
 			unordered_map<Tool*, sir::Tool*> saveTools;
 			unordered_map<Tool*, Tool> saveToolData;
 

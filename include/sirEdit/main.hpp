@@ -10,6 +10,7 @@ namespace sirEdit {
 	extern Gtk::Application* mainApplication;
 
 	extern void doSave(bool blocking=false);
+	extern std::string getSavePath();
 
 	extern void loadFile(Gtk::Window* window, Gtk::FileChooserNative* chooser);
 	extern void runInGui(std::function<void()> func);

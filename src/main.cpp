@@ -32,6 +32,8 @@ namespace sirEdit {
 	}
 }
 
+volatile bool ended = false;
+
 int main(int args, char** argv) {
 	// Test Sir
 	/*SkillFile* file = SkillFile::read("skill.sir");
@@ -64,6 +66,7 @@ int main(int args, char** argv) {
 		sirEdit::gui::runStartupWindow();
 	});
 	auto reuslt = application->run(args, argv);
+	ended = true;
 	return reuslt;
 
 	// GTK startup

@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <sirEdit/main.hpp>
 #include <sirEdit/data/tools.hpp>
+#include <thread>
+#include <sirEdit/data/specUpdater.hpp>
 
 using namespace std;
 using namespace sirEdit;
@@ -195,6 +197,13 @@ class MainWindow {
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::EXECUTE, Gtk::ICON_SIZE_BUTTON))));
+							button->signal_clicked().connect([i]() -> void {
+								std::string path; // TODO; path
+								std::string cmd = i->parseCMD(path);
+								std::thread([cmd]() -> void {
+									runCommand({"xterm", cmd}, getSavePath());
+								});
+							});
 							top->pack_start(*button, false, true);
 						}
 						{

@@ -76,7 +76,7 @@ namespace {
 			TypeClass e = {"e", "", {}, {}, &d};
 			TypeTypedef f = {"f", "", &i};
 			TypeClass g = {"g", "", {}, {}, &a};
-			TypeEnum h = {"h", "", {}, {}, &g};
+			TypeEnum h = {"h", "", {}, &g};
 			TypeClass i = {"i", "", {}, {}, nullptr};
 
 			TypeTestModel1() {

@@ -112,23 +112,20 @@ namespace sirEdit::data
 	};
 	class TypeEnum : public TypeWithFields {
 		private:
-			std::vector<std::string> __instances;
 			Type* __super;
 
 		public:
-			TypeEnum(std::string name, std::string comment, std::vector<Field> fields, std::vector<std::string> instances, Type* super) : TypeWithFields(std::move(name), std::move(comment), std::move(fields)), __instances(std::move(instances)), __super(super) {
+			TypeEnum(std::string name, std::string comment, std::vector<Field> fields, Type* super) : TypeWithFields(std::move(name), std::move(comment), std::move(fields)), __super(super) {
 				this->getMetaTypeName() = "ENUM";
 			}
-			TypeEnum(const Type& type, std::vector<Field> fields, std::vector<std::string> instances, Type* super) : TypeWithFields(std::move(type), std::move(fields)), __instances(std::move(instances)), __super(super) {
+			TypeEnum(const Type& type, std::vector<Field> fields, Type* super) : TypeWithFields(std::move(type), std::move(fields)), __super(super) {
 				this->getMetaTypeName() = "ENUM";
 			}
-			TypeEnum(const TypeWithFields& fields, std::vector<std::string> instances, Type* super) : TypeWithFields(std::move(fields)), __instances(std::move(instances)), __super(super) {
+			TypeEnum(const TypeWithFields& fields, Type* super) : TypeWithFields(std::move(fields)), __super(super) {
 				this->getMetaTypeName() = "ENUM";
 			}
 
-			const std::vector<std::string>& getInterfaces() const { return this->__instances; }
 			const Type* getSuper() const { return this->__super; }
-			std::vector<std::string>& getInstances() { return this->__instances; }
 			Type*& getSuper() { return this->__super; }
 	};
 	class TypeTypedef : public Type {
