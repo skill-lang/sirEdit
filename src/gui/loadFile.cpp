@@ -15,11 +15,36 @@ using namespace std;
 static thread* _loader_thread = new thread();
 static thread& loader_thread = *_loader_thread;
 
+static Glib::RefPtr<Gio::File> outputFile;
+static std::string filePath;
+static sirEdit::data::Serializer* ser;
+
+void sirEdit::doSave(bool blocking) {
+	// Save function
+	auto toRunFunc = []() -> void {
+		char buffer[256];
+		ifstream input(filePath, ios::binary);
+		auto output = outputFile->replace();
+		int read;
+		while((read = input.readsome(buffer, 256)) > 0) {
+			output->write(buffer, read);
+		}
+		output->close();
+		input.close();
+	};
+
+	// TODO: Asyc
+	ser->prepareSave();
+	ser->save();
+	toRunFunc();
+}
+
 inline void loadFileThread(Gtk::Window* mainWindow, Gtk::Window* popup, Glib::RefPtr<Gio::File> file) {
-	// TODO: Checks and crashes
+	outputFile = file;
 
 	// Create tmpfile
 	string fileName = tmpnam(nullptr); // TODO: replace tmpnam
+	filePath = fileName;
 	FILE* output = fopen(fileName.c_str(), "w");
 
 	// Read data
@@ -37,6 +62,7 @@ inline void loadFileThread(Gtk::Window* mainWindow, Gtk::Window* popup, Glib::Re
 
 	// Open file
 	std::unique_ptr<sirEdit::data::Serializer> serializer = std::move(sirEdit::data::getSir(fileName));
+	ser = serializer.get();
 	std::mutex mutex;
 	std::condition_variable cv;
 	std::unique_lock<std::mutex> lock(mutex);

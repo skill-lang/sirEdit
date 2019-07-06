@@ -3,6 +3,7 @@
 #include <sirEdit/main.hpp>
 #include <list>
 #include <unordered_map>
+#include <sirEdit/main.hpp>
 #include <sirEdit/data/tools.hpp>
 
 using namespace std;
@@ -343,6 +344,9 @@ class MainWindow {
 				this->__builder->get_widget("mainWindow", window);
 				window->show_all();
 				sirEdit::mainApplication->add_window(*window);
+				window->signal_hide().connect([]() -> void {
+					doSave();
+				});
 			}
 		}
 };

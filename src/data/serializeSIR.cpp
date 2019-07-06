@@ -276,6 +276,12 @@ namespace {
 			unordered_map<Field*, sir::FieldLike*> field;
 			unordered_map<sir::FieldLike*, Field*> fieldInverse;
 
+			list<Tool*> toAdd;
+			list<sir::Tool*> toRemove;
+
+			unordered_map<Tool*, sir::Tool*> saveTools;
+			unordered_map<Tool*, Tool> saveToolData;
+
 			template<class TYPE, class SOURCE>
 			void addSuper(const SOURCE& source) {
 				for(auto& i : source) {
@@ -288,6 +294,10 @@ namespace {
 						static_cast<TYPE*>(typesInverse[&i])->getSuper() = tmp->second;
 					}
 				}
+			}
+
+			auto newSirString(const std::string& source) {
+				return this->sf->strings->add(source.c_str(), source.size());
 			}
 
 		public:
@@ -422,11 +432,15 @@ namespace {
 				throw; // TODO:
 			}
 			void addBaseTool(Tool* tool) {
-				auto tmp = this->sf->Tool->add();
-				this->tools[tool] = tmp;
+				this->toAdd.push_back(tool);
+				//auto tmp = this->sf->Tool->add();
+				this->tools[tool] = nullptr;
 			}
 			void removeBaseTool(Tool* tool) {
-				throw; // TODO:
+				this->toRemove.push_back(tools[tool]);
+				//this->sf->free(this->tools[tool]);
+				this->tools.erase(tool);
+				delete tool;
 			}
 			void getBaseTypes(std::function<void(Type*)> callbackFunc) {
 				for(auto& i : this->types)
@@ -437,10 +451,109 @@ namespace {
 					callbackFunc(i.first);
 			}
 			void prepareSave() {
-				throw; // TODO:
+				// New tools
+				for(auto& i : this->toAdd)
+					if(this->tools.count(i) != 0)
+						this->tools[i] = this->sf->Tool->add();
+				this->toAdd.clear();
+
+				// Remove old tools
+				for(auto& i : this->toRemove)
+					if(i != nullptr)
+						this->sf->free(i);
+				this->toRemove.clear();
+
+				// Copy Tool states
+				this->saveTools = this->tools;
+				for(auto& i : this->tools)
+					this->saveToolData.insert({i.first, *(i.first)});
+				// TODO: Types
 			}
 			void save() {
-				throw; // TODO:
+				// Copy tool data
+				for(auto& i : this->saveToolData) {
+					sir::Tool* sTool = this->saveTools[i.first];
+					sTool->setName(this->newSirString(i.second.getName()));
+					sTool->setCommand(this->newSirString(i.second.getCommand()));
+					sTool->setDescription(this->newSirString(i.second.getDescription()));
+
+					// Update types
+					auto types = new ::skill::api::Map<::sir::UserdefinedType*, ::skill::api::String>();
+					if(sTool->getSelectedUserTypes() !=  nullptr)
+						delete sTool->getSelectedUserTypes();
+					sTool->setSelectedUserTypes(types);
+					for(auto& j : i.second.getStatesTypes()) {
+						switch(get<1>(j.second)) {
+							case TYPE_STATE::READ:
+								(*types)[static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(j.first)])] = this->newSirString("r");
+								break;
+							case TYPE_STATE::WRITE:
+								(*types)[static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(j.first)])] = this->newSirString("w");
+								break;
+							case TYPE_STATE::DELETE:
+								(*types)[static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(j.first)])] = this->newSirString("d");
+								break;
+							case TYPE_STATE::UNUSED:
+								(*types)[static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(j.first)])] = this->newSirString("u");
+								break;
+							case TYPE_STATE::NO:
+								break;
+						}
+					}
+
+					// Update fields
+					{
+						auto fields = new ::skill::api::Map<::sir::UserdefinedType*, ::skill::api::Map<::sir::FieldLike*, ::skill::api::String>*>();
+						if(sTool->getSelectedFields() != nullptr)
+							delete sTool->getSelectedFields();
+						sTool->setSelectedFields(fields);
+
+						// Copy field data
+						for(auto& j : i.second.getStatesFields()) {
+							for(auto& k : j.second) {
+								// Get string
+								bool found = false;
+								::skill::api::String s;
+								switch(k.second) {
+									case FIELD_STATE::READ:
+										s = this->newSirString("r");
+										found = true;
+										break;
+									case FIELD_STATE::WRITE:
+										s = this->newSirString("w");
+										found = true;
+										break;
+									case FIELD_STATE::CREATE:
+										s = this->newSirString("c");
+										found = true;
+										break;
+									case FIELD_STATE::UNUSED:
+										s = this->newSirString("u");
+										found = true;
+										break;
+									case FIELD_STATE::NO:
+										break;
+								}
+								if(!found)
+									continue;
+
+								// Insert data
+								auto tmp = fields->find(static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(k.first)]));
+								if(tmp == fields->end()) {
+									fields->insert({static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(k.first)]), new ::skill::api::Map<::sir::FieldLike*, ::skill::api::String>()});
+									tmp = fields->find(static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(k.first)]));
+								}
+
+								(*(tmp->second))[this->field[const_cast<Field*>(j.first)]] = s;
+							}
+						}
+					}
+				}
+				this->saveToolData.clear();
+				this->saveTools.clear();
+
+				// TODO: Types!
+				this->sf->flush();
 			}
 	};
 }
