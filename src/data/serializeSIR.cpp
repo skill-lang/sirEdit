@@ -63,6 +63,15 @@ inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source
 		fields[counter] = std::move(sirEdit::data::Field(parseString(i->getName()->getParts()), parseComment(i->getComment()), {}));
 		counter++;
 	}
+	if constexpr(is_same<SOURCE, sir::EnumType>::value) {
+		if(source->getInstances() != nullptr) {
+			fields.resize(counter + source->getInstances()->size());
+			for(auto& i : *(source->getInstances())) {
+				fields[counter] = sirEdit::data::Field(parseString(i->getParts()), "", {});
+				counter++;
+			}
+		}
+	}
 	return std::move(std::make_unique<sirEdit::data::TypeWithFields>(parseString(source->getName()->getParts()), parseComment(source->getComment()), std::move(fields))); // TODO: Add comments
 }
 inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
@@ -78,8 +87,15 @@ inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf)));
 		result = new TypeInterface(std::move(*(fields.get())), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
-	else
-		throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
+	else if(skillType == sir::EnumType::typeName) {
+		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::EnumType*>(&uf)));
+		result = new TypeEnum(std::move(*(fields.get())), nullptr);
+	}
+	else if(skillType == sir::TypeDefinition::typeName) {
+		result = new TypeTypedef(parseString(uf.getName()->getParts()), parseComment(uf.getComment()), nullptr);
+	}
+	//else
+	//	throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
 
 	// Hints
 	if(uf.getHints() != nullptr)
