@@ -78,7 +78,8 @@ namespace sirEdit::data {
 				this->addBaseTool(tool);
 			}
 			void removeTool(Tool* tool) {
-				throw;// TODO
+				this->__tools.erase(std::find(this->__tools.begin(), this->__tools.end(), tool));
+				this->removeBaseTool(tool);
 			}
 			virtual void prepareSave() = 0;
 			virtual void save() = 0;
@@ -154,6 +155,10 @@ namespace sirEdit::data {
 				this->__serializer.addTool(tmp);
 				updateCall(this->__change_callback);
 				return tmp;
+			}
+			void removeTool(const Tool& tool) {
+				this->__serializer.removeTool(const_cast<Tool*>(&tool));
+				updateCall(this->__change_callback);
 			}
 			void setFieldStatus(const Tool& tool, const Type& type, const Field& field, FIELD_STATE state, const std::function<void(const Type&, const Field&, FIELD_STATE, FIELD_STATE)>& callback_field, const std::function<void(const Type&, TYPE_STATE, TYPE_STATE)>& callback_type) {
 				// Set state

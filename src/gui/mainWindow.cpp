@@ -200,8 +200,8 @@ class MainWindow {
 							button->signal_clicked().connect([i]() -> void {
 								std::string path; // TODO; path
 								std::string cmd = i->parseCMD(path);
-								std::thread([cmd]() -> void {
-									runCommand({"xterm", cmd}, getSavePath());
+								new std::thread([cmd]() -> void {
+									runCommand({"xterm", "sh -c " + cmd}, getSavePath());
 								});
 							});
 							top->pack_start(*button, false, true);
@@ -221,6 +221,9 @@ class MainWindow {
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::DELETE, Gtk::ICON_SIZE_BUTTON))));
+							button->signal_clicked().connect([i, this]() -> void {
+								this->__transitions.removeTool(*i);
+							});
 							top->pack_start(*button, false, true);
 						}
 						main->pack_start(*top, true, true);

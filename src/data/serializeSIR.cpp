@@ -451,12 +451,10 @@ namespace {
 			}
 			void addBaseTool(Tool* tool) {
 				this->toAdd.push_back(tool);
-				//auto tmp = this->sf->Tool->add();
 				this->tools[tool] = nullptr;
 			}
 			void removeBaseTool(Tool* tool) {
 				this->toRemove.push_back(tools[tool]);
-				//this->sf->free(this->tools[tool]);
 				this->tools.erase(tool);
 				delete tool;
 			}
