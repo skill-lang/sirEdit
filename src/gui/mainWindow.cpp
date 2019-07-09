@@ -1,7 +1,7 @@
 #include <gtkmm.h>
 #include "mainWindow.hpp"
-#include <sirEdit/main.hpp>
 #include <list>
+#include <fstream>
 #include <unordered_map>
 #include <sirEdit/main.hpp>
 #include <sirEdit/data/tools.hpp>
@@ -245,6 +245,40 @@ class MainWindow {
 			this->__toolsPopover->show_all();
 		}
 
+		//
+		// Import
+		//
+		// User should save the file
+		void __importTools() {
+			auto chooser = Gtk::FileChooserNative::create("SIR-File", Gtk::FILE_CHOOSER_ACTION_OPEN);
+			switch(chooser->run()) {
+				case Gtk::RESPONSE_ACCEPT:
+					// Copy file
+					std::string folderName = tmpnam(nullptr);
+					{
+						char buffer[256];
+						int readed;
+						std::ofstream outLocal(folderName, std::ios::out | std::ios::binary);
+						auto tmp = chooser->get_file()->read();
+						while((readed = tmp->read(buffer, 256)) != 0)
+							outLocal.write(buffer, readed);
+						tmp->close();
+					}
+
+					// Open file
+					{
+						auto newSpec = getSir(folderName);
+						SpecModify own;
+						own.types = this->__serializer->getTypes();
+						own.updateFields();
+						std::vector<Tool*> toolsToAdd;
+						std::vector<const Type*> tmp = {newSpec->getTypes().begin(), newSpec->getTypes().end()};
+						for(auto& i  : newSpec->getTools())
+							toolsToAdd.push_back(new Tool(move(own.parseTool(*i, tmp))));
+						this->__transitions.importTools(toolsToAdd);
+					}
+			}
+		}
 	public:
 		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
 			// Builder
@@ -260,6 +294,15 @@ class MainWindow {
 
 			// Notebook
 			this->__builder->get_widget("Notebook", this->__notebook);
+
+			// Import
+			{
+				Gtk::Button* button;
+				this->__builder->get_widget("ImportButton", button);
+				button->signal_clicked().connect([this]() -> void {
+					this->__importTools();
+				});
+			}
 
 			// Export
 			{
