@@ -3,10 +3,12 @@
 #include <list>
 #include <fstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <sirEdit/main.hpp>
 #include <sirEdit/data/tools.hpp>
-#include <thread>
 #include <sirEdit/data/specUpdater.hpp>
+#include <thread>
+#include <iostream>
 
 using namespace std;
 using namespace sirEdit;
@@ -193,15 +195,29 @@ class MainWindow {
 								this->__toolsPopover->hide();
 							});
 						}
+
+						// run command
 						{
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::EXECUTE, Gtk::ICON_SIZE_BUTTON))));
-							button->signal_clicked().connect([i]() -> void {
-								std::string path; // TODO; path
-								std::string cmd = i->parseCMD(path);
-								new std::thread([cmd]() -> void {
-									runCommand({"xterm", "sh -c " + cmd}, getSavePath());
+							button->signal_clicked().connect([this, i]() -> void {
+								new std::thread([this, i]() -> void {
+									std::string specFile = getSavePath() + "/spec_" + i->getName() + ".skill";
+									{
+										std::string spec = getSpec(i);
+										std::ofstream specOut(specFile, ios::binary | ios::out);
+										specOut << spec;
+										specOut.close();
+									}
+									std::string cmd = i->parseCMD(specFile);
+									std::cout << "COMMAND: " << cmd << std::endl;
+									{
+										std::ofstream codegen(getSavePath() + "/codegen.jar", ios::binary | ios::out);
+										codegen << sirEdit_codegen;
+										codegen.close();
+									}
+									runCommand({"xterm", "-e", cmd + "; sleep 10"}, getSavePath());
 								});
 							});
 							top->pack_start(*button, false, true);

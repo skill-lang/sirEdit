@@ -1,8 +1,11 @@
+#include <cstdio>
 #include <File.h>
 #include <TypesOfType.h>
+#include <fstream>
 #include <sirEdit/main.hpp>
 #include <sirEdit/data/serialize.hpp>
-#include <sirEdit/utils/conver.hpp>
+#include <sirEdit/data/specUpdater.hpp>
+//#include <sirEdit/utils/conver.hpp>
 #include <unordered_map>
 #include <tuple>
 #include <functional>
@@ -35,32 +38,45 @@ inline std::string parseComment(sir::Comment* comment) {
 	auto tmp = comment->getText();
 	if(tmp == nullptr)
 		return "";
-	return parseString(tmp, " ");
-	// TODO: Tags
+	auto result = parseString(tmp, " ");
+
+	// Tags
+	if constexpr(false) {// TODO: Current buggy
+		if(comment->getTags() != nullptr)
+			for(auto& i : *(comment->getTags())) {
+				if(i == nullptr)
+					continue;
+				result += string("\n@") + *(i->getName());
+				if(i->getText() != nullptr)
+					for(auto& j : *(i->getText()))
+						result += std::string(" ") + *j;
+			}
+	}
+	return result;
 }
 
 template<class FUNC>
 inline void findFieldInSIR(sir::Type* type, FUNC func) {
 	std::string skillType = type->skillName();
-	if(skillType == sir::ClassType::typeName) {
+	if(skillType == sir::ClassType::typeName)
 		func(static_cast<sir::ClassType*>(type)->getFields());
-	}
-	else if(skillType == sir::InterfaceType::typeName) {
+	else if(skillType == sir::InterfaceType::typeName)
 		func(static_cast<sir::InterfaceType*>(type)->getFields());
-	}
+	else if(skillType == sir::EnumType::typeName)
+		func(static_cast<sir::EnumType*>(type)->getFields());
 	else
 		throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
 }
 
 template<class SOURCE>
-inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source) {
+inline sirEdit::data::TypeWithFields _loadFields(SOURCE* source) {
 	if(source == nullptr)
 		throw std::invalid_argument("Source is null pointer");
 	std::vector<sirEdit::data::Field> fields;
 	fields.resize(source->getFields()->size());
 	size_t counter = 0;
 	for(sir::FieldLike* i : *(source->getFields())) {
-		fields[counter] = std::move(sirEdit::data::Field(parseString(i->getName()->getParts()), parseComment(i->getComment()), {}));
+		fields[counter] = sirEdit::data::Field(parseString(i->getName()->getParts()), parseComment(i->getComment()), {});
 		counter++;
 	}
 	if constexpr(is_same<SOURCE, sir::EnumType>::value) {
@@ -72,7 +88,7 @@ inline std::unique_ptr<sirEdit::data::TypeWithFields> _loadFields(SOURCE* source
 			}
 		}
 	}
-	return std::move(std::make_unique<sirEdit::data::TypeWithFields>(parseString(source->getName()->getParts()), parseComment(source->getComment()), std::move(fields))); // TODO: Add comments
+	return sirEdit::data::TypeWithFields(parseString(source->getName()->getParts()), parseComment(source->getComment()), std::move(fields));
 }
 inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 	std::string skillType = uf.skillName();
@@ -80,16 +96,16 @@ inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 
 	// Create type
 	if(skillType == sir::ClassType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::ClassType*>(&uf)));
-		result = new TypeClass(std::move(*(fields.get())), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
+		sirEdit::data::TypeWithFields fields = _loadFields(static_cast<sir::ClassType*>(&uf));
+		result = new TypeClass(std::move(fields), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else if(skillType == sir::InterfaceType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::InterfaceType*>(&uf)));
-		result = new TypeInterface(std::move(*(fields.get())), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
+		sirEdit::data::TypeWithFields fields = _loadFields(static_cast<sir::InterfaceType*>(&uf));
+		result = new TypeInterface(std::move(fields), std::vector<sirEdit::data::TypeInterface*>(), nullptr);
 	}
 	else if(skillType == sir::EnumType::typeName) {
-		std::unique_ptr<sirEdit::data::TypeWithFields> fields = std::move(_loadFields(static_cast<sir::EnumType*>(&uf)));
-		result = new TypeEnum(std::move(*(fields.get())), nullptr);
+		sirEdit::data::TypeWithFields fields = _loadFields(static_cast<sir::EnumType*>(&uf));
+		result = new TypeEnum(std::move(fields), nullptr);
 	}
 	else if(skillType == sir::TypeDefinition::typeName) {
 		result = new TypeTypedef(parseString(uf.getName()->getParts()), parseComment(uf.getComment()), nullptr);
@@ -156,7 +172,7 @@ inline Type* addBuildinType(sir::Type* type, unordered_map<sir::Type*, Type*>& t
 	typeInverse[type] = tmp;
 	return tmp;
 }
-inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fields, unordered_map<sir::Type*, Type*>& typeInverse) {
+inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fields, unordered_map<sir::FieldLike*, Field*>& fieldInverse, unordered_map<sir::Type*, Type*>& typeInverse) {
 	// Find field
 	sir::FieldLike* orignalField = nullptr;
 	{
@@ -170,6 +186,7 @@ inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fi
 		else
 			orignalField = tmp->second;
 	}
+	fieldInverse[orignalField] = &field;
 
 	// TODO: Views and custome type
 
@@ -317,11 +334,128 @@ namespace {
 			auto newSirString(const std::string& source) {
 				return this->sf->strings->add(source.c_str(), source.size());
 			}
+			auto newSirComment(const std::string& comment) {
+				auto result = this->sf->Comment->add();
+				auto tmp = new skill::api::Array<skill::api::String>(1);
+				(*tmp)[0] = this->newSirString(comment);
+				result->setText(tmp);
+				return result;
+			}
+			sir::Identifier* newSirIdentifier(const std::string& source) {
+				auto name = this->newSirString(source);
+				auto part = new skill::api::Array<::skill::api::String>(1);
+				(*part)[0] = name;
+				auto result = this->sf->Identifier->add();
+				result->setSkillname(name);
+				result->setParts(part);
+				return result;
+			}
+			template<class SOURCE, class TARGET>
+			void doDefault(SOURCE* source, TARGET* target) {
+				// Add name and comment
+				target->setName(this->newSirIdentifier(source->getName()));
+				target->setComment(this->newSirComment(source->getComment()));
+
+				// Add hints
+				{
+					auto tmp = new skill::api::Array<sir::Hint*>(0);
+					target->setHints(tmp);
+					for(auto& i : source->getHints()) {
+						auto tmp2 = this->sf->Hint->add();
+						tmp->push_back(tmp2);
+						tmp2->setName(this->newSirString(i.first));
+						auto tmp3 = new skill::api::Array<skill::api::String>(0);
+						tmp2->setArguments(tmp3);
+						for(auto& j : i.second)
+							tmp3->push_back(this->newSirString(j));
+					}
+				}
+
+				// Add restrictions
+				{
+					auto tmp = new skill::api::Array<sir::Restriction*>(0);
+					target->setRestrictions(tmp);
+					for(auto& i : source->getRestrictions()) {
+						auto tmp2 = this->sf->Restriction->add();
+						tmp->push_back(tmp2);
+						tmp2->setName(this->newSirString(i.first));
+						auto tmp3 = new skill::api::Array<skill::api::String>(0);
+						tmp2->setArguments(tmp3);
+						for(auto& j : i.second)
+							tmp3->push_back(this->newSirString(j));
+					}
+				}
+			}
+
+			sir::Type* addSirType(Type* type) {
+				// Check if instance allready exists
+				{
+					auto tmp = this->types.find(type);
+					if(tmp != this->types.end())
+						if(tmp->second != nullptr)
+							return tmp->second;
+				}
+
+				// Add sir type
+				sir::Type* result = doBaseType(type, [this, type]() -> sir::Type* { // Base
+					return this->sf->SimpleType->add(this->newSirIdentifier(type->getName()));
+				}, [this, type]() -> sir::Type* { // Interface
+					auto result = this->sf->InterfaceType->add();
+					this->doDefault(type, result);
+					return result;
+				}, [this, type]() -> sir::Type* { // Class
+					auto result = this->sf->ClassType->add();
+					this->doDefault(type, result);
+					return result;
+				}, [this, type]() -> sir::Type* { // Enum
+					auto result = this->sf->EnumType->add();
+
+					// Add enum instances
+					{
+						auto tmp = new skill::api::Array<::sir::Identifier*>(0);
+						result->setInstances(tmp);
+						for(auto& i : static_cast<TypeEnum*>(type)->getFields())
+							if(i.getMeta().type == FieldMeta::META_TYPE::ENUM_INSTANCE)
+								tmp->push_back(this->newSirIdentifier(i.getName()));
+					}
+					return result;
+				}, [this, type]() -> sir::Type* { // Typedef
+					auto result = this->sf->TypeDefinition->add();
+					this->doDefault(type, result);
+					return result;
+				});
+				this->types[type] = result;
+				return result;
+			}
+
+			void updateType(Type* type) {
+				sir::Type* sirType = this->types[type];
+				// Update content
+				doBaseType(type, []() -> void {}, [this, type, sirType]() -> void { // Interface
+					// Set super
+					auto tmp = dynamic_cast<sir::InterfaceType*>(sirType);
+					tmp->setSuper(dynamic_cast<sir::ClassType*>(this->addSirType(const_cast<Type*>(getSuper(*type)))));
+				}, [this, type, sirType]() -> void { // Class
+					// Set super
+					auto tmp = dynamic_cast<sir::ClassType*>(sirType);
+					tmp->setSuper(dynamic_cast<sir::ClassType*>(this->addSirType(const_cast<Type*>(getSuper(*type)))));
+
+					// Set implementations
+					auto tmp2 = new skill::api::Set<sir::InterfaceType*>(0);
+					tmp->setInterfaces(tmp2);
+				}, []() -> void {}, [this, type, sirType]() -> void { // Typedef
+					auto tmp = dynamic_cast<sir::TypeDefinition*>(sirType);
+					tmp->setTarget(dynamic_cast<sir::ClassType*>(this->addSirType(const_cast<Type*>(getSuper(*type)))));
+				});
+			}
 
 		public:
 			SerializerSIR(std::string path) {
 				// Open file
-				this->sf = SkillFile::open(path);
+				if(std::ifstream(path).good())
+					this->sf = SkillFile::open(path);
+				else
+					this->sf = SkillFile::create(path);
 				if(this->sf == nullptr)
 					throw; // TODO: Exception
 
@@ -350,8 +484,12 @@ namespace {
 					if(tmp == nullptr)
 						continue; // Alias type
 					for(auto& j : tmp->getFields())
-						updateField(j, this->field, this->typesInverse);
+						updateField(j, this->field, this->fieldInverse, this->typesInverse);
 				}
+
+				// Field inverse pass
+				for(auto& i : this->field)
+					this->fieldInverse[i.second] = i.first;
 
 				// Read tools
 				for(auto& i : this->sf->Tool->all()) {
@@ -361,7 +499,7 @@ namespace {
 					tmpTool->getCommand() = std::move(std::string(i.getCommand()->begin(), i.getCommand()->end()));
 
 					// Load type states
-					for(auto& j : *(i.getSelectedUserTypes())) {
+					for(auto& j : *(i.getSelTypes())) {
 						// Find type
 						Type* type = nullptr;
 						{
@@ -391,7 +529,8 @@ namespace {
 					}
 
 					// Load field states
-					for(auto& j : *(i.getSelectedFields())) {
+					std::cout << "Fields :" << this->fieldInverse.size() << std::endl;
+					for(auto& j : *(i.getSelFields())) {
 						// Find type
 						Type* type = nullptr;
 						{
@@ -441,10 +580,19 @@ namespace {
 			}
 			~SerializerSIR() {
 				delete this->sf;
+
+				// Clear up types
+				for(auto& i : this->types)
+					delete i.first;
+
+				// Clear up tools
+				for(auto& i : this->tools)
+					delete i.first;
 			}
 
 			void addBaseType(Type* type) {
-				throw; // TODO:
+				this->addType.push_back(type);
+				this->types[type] = nullptr;
 			}
 			void removeBaseType(Type* type) {
 				throw; // TODO:
@@ -469,8 +617,32 @@ namespace {
 			void prepareSave() {
 				// New tools
 				for(auto& i : this->toAdd)
-					if(this->tools.count(i) != 0)
-						this->tools[i] = this->sf->Tool->add();
+					if(this->tools.count(i) != 0) {
+						// Add tool
+						auto tool = this->sf->Tool->add();
+						this->tools[i] = tool;
+
+						// Add buildtarget skill
+						auto bi = new skill::api::Array<sir::BuildInformation*>(1);
+						tool->setBuildTargets(bi);
+						auto skill = this->sf->BuildInformation->add();
+						(*bi)[0] = skill;
+						skill->setLanguage(this->newSirString("skill"));
+						auto skillOutput = this->sf->FilePath->add();
+						auto skillOutputPath = new skill::api::Array<skill::api::String>(1);
+						(*skillOutputPath)[0] = this->newSirString(".");
+						skillOutput->setParts(skillOutputPath);
+						skillOutput->setIsAbsolut(false);
+						skill->setOutput(skillOutput);
+						auto options = new skill::api::Array<skill::api::String>(2);
+						(*options)[0] = this->newSirString("--package");
+						(*options)[1] = this->newSirString("package");
+						skill->setOptions(options);
+
+						// Fix bugs
+						tool->setCustomTypeAnnotations(new skill::api::Map<sir::UserdefinedType*, sir::ToolTypeCustomization*>());
+						tool->setCustomFieldAnnotations(new skill::api::Map<sir::FieldLike*, sir::ToolTypeCustomization*>());
+					}
 				this->toAdd.clear();
 
 				// Remove old tools
@@ -483,7 +655,11 @@ namespace {
 				this->saveTools = this->tools;
 				for(auto& i : this->tools)
 					this->saveToolData.insert({i.first, *(i.first)});
-				// TODO: Types
+
+				// Add types
+				for(auto& i : this->addType)
+					this->addSirType(i);
+				// TODO: Remove types
 			}
 			void save() {
 				// Copy tool data
@@ -572,6 +748,36 @@ namespace {
 				this->sf->flush();
 			}
 	};
+}
+
+extern std::string sirEdit::data::SpecModify::dropToSIR() {
+	string sirFile = string(tmpnam(nullptr)) + ".sir";
+	auto serializer = sirEdit::data::getSir(sirFile);
+	for(auto& i : this->types)
+		serializer->addType(i);
+	serializer->prepareSave();
+	serializer->save();
+	return sirFile;
+}
+extern std::string sirEdit::data::SpecModify::dropToSKilL() {
+	// Create path
+	string path = string(tmpnam(nullptr));
+	mkdir(path.c_str(), 0777);
+
+	// Export sir
+	{
+		auto serializer = sirEdit::data::getSir(path + "/sir.sir");
+		for(auto& i : this->types)
+			serializer->addType(i);
+		serializer->prepareSave();
+		serializer->save();
+	}
+
+	// Generate specification
+	runCodegen({"sir.sir", "--add-tool", "export"}, path);
+	runCodegen({"sir.sir", "-t", "export", "--select-types", "*"}, path);
+	runCodegen({"sir.sir", "-t", "export", "--add-target", "skill . --package skill"}, path);
+	return path + "/specification.skill";
 }
 
 namespace sirEdit::data {

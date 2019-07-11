@@ -61,8 +61,62 @@ namespace sirEdit::data {
 				}, [source, super]() -> Type* {
 					return new TypeTypedef(source->getName(), source->getComment(), super);
 				});
+
+				// Set hints and restriciton and return
+				result->getHints() = source->getHints();
+				result->getRestrictions() = source->getRestrictions();
+				return result;
 			}
 
+			void fieldCopyTo(const Field& source, Field& target) {
+				// Copy basedata
+				target.getType() = source.getType();
+				target.getMeta() = source.getMeta();
+				target.getName() = source.getName();
+				target.getComment() = source.getComment();
+				target.getHints() = source.getHints();
+				target.getRestrictions() = source.getRestrictions();
+				this->oldToNewField[&target] = &source;
+
+				// Update types
+				for(auto& i : target.getType().types)
+					i = this->addType(i);
+
+				// Update view
+				if(source.getMeta().view != nullptr) {
+					auto tmp = this->oldToNewField.find(&source);
+					if(tmp == this->oldToNewField.end()) {
+						auto tmp2 = this->requiredViews.find(&target);
+						if(tmp2 == this->requiredViews.end())
+							tmp2->second.push_back(&target);
+						else
+							this->requiredViews[&source] = {&target};
+					}
+					else
+						const_cast<const Field*&>(source.getMeta().view) = tmp->second;
+				}
+
+				// Update remote views
+				{
+					auto tmp = this->requiredViews.find(&source);
+					if(tmp != this->requiredViews.end()) {
+						for(auto& i : tmp->second)
+							i->getMeta().view = &target;
+						tmp->second.clear();
+					}
+				}
+			}
+
+			bool calcCycle(std::unordered_set<Type*>& typeList, TypeInterface* interface) {
+				if(typeList.find(interface) != typeList.end())
+					return true;
+				typeList.insert(interface);
+				for(auto& i : interface->getInterfaces())
+					if(this->calcCycle(typeList, i))
+						return true;
+				typeList.erase(interface);
+				return false;
+			}
 
 		public:
 			std::vector<Type*> types;
@@ -75,18 +129,37 @@ namespace sirEdit::data {
 						return tmp->second;
 				}
 
+				// Search type
+				const Type* result = nullptr;
 				for(auto i : this->types) {
-					if(this->compareType(like, *i))
-						return i;
+					if(this->compareType(like, *i)) {
+						result = i;
+						break;
+					}
 				}
-				return nullptr;
+
+				// Cache an return
+				if(result != nullptr)
+					this->oldToNewType[&like] = result;
+				return result;
 			}
+
 			const Field* findField(const Field& like) const {
-				for(auto i : this->fields) {
-					if(this->compareField(like, *i))
-						return i;
+				// Try to use the cache
+				{
+					auto tmp = this->oldToNewField.find(&like);
+					if(tmp != this->oldToNewField.end())
+						return tmp->second;
 				}
-				return nullptr;
+
+				// Cache entry not found
+				const Field* result = nullptr;
+				for(auto i : this->fields) {
+					if(this->compareField(like, *i)) {
+						result = i;
+						break;
+					}
+				}
 
 				// Update cache and return
 				if(result != nullptr)
@@ -124,6 +197,7 @@ namespace sirEdit::data {
 				for(auto i : toAdd) {
 					if(!checkType(i))
 						continue;
+
 					auto j = this->findType(*i);
 					// Add interfaces
 					if(dynamic_cast<const TypeClass*>(j) != nullptr || dynamic_cast<const TypeInterface*>(j)) {
@@ -135,7 +209,18 @@ namespace sirEdit::data {
 						}
 					}
 
-					// TODO:
+					// TODO: Fields
+				}
+
+				// Cycle check
+				for(auto& i : this->types)
+					if(dynamic_cast<TypeInterface*>(i) != nullptr) {
+						std::unordered_set<Type*> cycle;
+						this->__hasCycle |= this->calcCycle(cycle, dynamic_cast<TypeInterface*>(i));
+					}
+			}
+
+			bool hasCycle() const { return this->__hasCycle; }
 
 			void updateFields() {
 				for(auto& i : this->types) {
@@ -367,6 +452,9 @@ namespace sirEdit::data {
 				// Return tool
 				return result;
 			}
+
+			std::string dropToSIR();
+
+			std::string dropToSKilL();
 	};
 }
-
