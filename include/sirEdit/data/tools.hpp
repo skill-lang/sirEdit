@@ -381,7 +381,7 @@ namespace sirEdit::data {
 			 * @return commands to run
 			 */
 			std::string parseCMD(std::string spec) const {
-				std::string result = this->getCommand();
+				std::string result = "";
 				size_t current = 0;
 				while(true) {
 					size_t tmp = this->getCommand().find("$CODEGEN", current);
