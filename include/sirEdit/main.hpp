@@ -11,6 +11,8 @@ namespace sirEdit {
 
 	extern void doSave(bool blocking=false);
 	extern std::string getSavePath();
+	extern std::string getSirPath();
+	extern std::string getSpec(const sirEdit::data::Tool* tool);
 
 	extern void loadFile(Gtk::Window* window, Gtk::FileChooserNative* chooser);
 	extern void runInGui(std::function<void()> func);

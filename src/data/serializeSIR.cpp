@@ -11,6 +11,8 @@
 #include <functional>
 #include <stdexcept>
 
+#include <iostream>
+
 using namespace sir::api;
 using namespace sirEdit::data;
 using namespace std;
@@ -671,9 +673,10 @@ namespace {
 
 					// Update types
 					auto types = new ::skill::api::Map<::sir::UserdefinedType*, ::skill::api::String>();
-					if(sTool->getSelectedUserTypes() !=  nullptr)
-						delete sTool->getSelectedUserTypes();
-					sTool->setSelectedUserTypes(types);
+					if(sTool->getSelTypes() !=  nullptr)
+						delete sTool->getSelTypes();
+					sTool->setSelTypes(types);
+
 					for(auto& j : i.second.getStatesTypes()) {
 						switch(get<1>(j.second)) {
 							case TYPE_STATE::READ:
@@ -696,9 +699,9 @@ namespace {
 					// Update fields
 					{
 						auto fields = new ::skill::api::Map<::sir::UserdefinedType*, ::skill::api::Map<::sir::FieldLike*, ::skill::api::String>*>();
-						if(sTool->getSelectedFields() != nullptr)
-							delete sTool->getSelectedFields();
-						sTool->setSelectedFields(fields);
+						if(sTool->getSelFields() != nullptr)
+							delete sTool->getSelFields();
+						sTool->setSelFields(fields);
 
 						// Copy field data
 						for(auto& j : i.second.getStatesFields()) {
@@ -736,9 +739,48 @@ namespace {
 									tmp = fields->find(static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(k.first)]));
 								}
 
-								(*(tmp->second))[this->field[const_cast<Field*>(j.first)]] = s;
+								auto& tmp2 = (*fields)[static_cast<sir::UserdefinedType*>(this->types[const_cast<Type*>(k.first)])];
+								(*tmp2)[this->field[const_cast<Field*>(j.first)]] = s;
 							}
 						}
+					}
+
+					// Update codegen data
+					{
+						if(sTool->getSelectedUserTypes() == nullptr)
+							sTool->setSelectedUserTypes(new skill::api::Set<sir::UserdefinedType*>(0));
+						if(sTool->getSelectedFields() == nullptr)
+							sTool->setSelectedFields(new skill::api::Map<sir::UserdefinedType*, skill::api::Map<skill::api::String, sir::FieldLike*>*>());
+						auto& forCMDType = *(sTool->getSelectedUserTypes());
+						forCMDType.clear();
+						auto& forCMDField = *(sTool->getSelectedFields());
+						forCMDField.clear();
+
+						// Bugfix for interfaces
+						for(auto& j : this->types) {
+							if(i.second.getTypeTransitiveState(*j.first) < TYPE_STATE::READ)
+								continue;
+							auto nothing = []() -> void {};
+							doBaseType(j.first, nothing, [&i, j]() -> void {
+								for(auto& k : getFields(*j.first))
+									i.second.setFieldState(*j.first, k, FIELD_STATE::READ);
+							}, nothing, nothing, nothing);
+						}
+
+						// Set data
+						for(auto j : this->types)
+							if(dynamic_cast<sir::UserdefinedType*>(j.second) != nullptr)
+								if(i.second.getTypeTransitiveState(*j.first) >= TYPE_STATE::READ) {
+									forCMDType.insert(dynamic_cast<sir::UserdefinedType*>(j.second));
+									auto fieldsRef = new skill::api::Map<skill::api::String, sir::FieldLike*>();
+									forCMDField[dynamic_cast<sir::UserdefinedType*>(j.second)] = fieldsRef;
+									for(auto& k : listAllFields(*(j.first)))
+										if(i.second.getFieldTransitiveState(*k) >= FIELD_STATE::READ) {
+											auto tmp = this->field.find(const_cast<Field*>(k));
+											if(tmp != this->field.end())
+												(*fieldsRef)[this->newSirString(j.first->getName())] = tmp->second;
+										}
+								}
 					}
 				}
 				this->saveToolData.clear();

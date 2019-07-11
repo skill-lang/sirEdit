@@ -1,9 +1,11 @@
 #include <cstdio>
 #include <fstream>
 #include <atomic>
+#include <fstream>
 #include <future>
 #include <iostream>
 #include <thread>
+#include <mutex>
 #include <sirEdit/main.hpp>
 #include <sirEdit/data/serialize.hpp>
 
@@ -21,12 +23,53 @@ static thread& loader_thread = *_loader_thread;
 static Glib::RefPtr<Gio::File> outputFile;
 static std::string filePath;
 static sirEdit::data::Serializer* ser;
+static mutex saveMutex;
 
-std::string sirEdit::getSavePath() {
+extern std::string sirEdit::getSavePath() {
 	return outputFile->get_parent()->get_path();
 }
+extern std::string sirEdit::getSirPath() {
+	return filePath;
+}
+extern std::string sirEdit::getSpec(const sirEdit::data::Tool* tool) {
+	// Global spec?
+	bool wasGlobal = false;
+	if(tool == nullptr) {
+		wasGlobal = true;
+		auto* t = new sirEdit::data::Tool("@@ALL@@", "", "");
+		tool = t;
+		for(auto& i : ser->getTypes())
+			for(auto& j : sirEdit::data::getFields(*i))
+				t->setFieldState(*i, j, sirEdit::data::FIELD_STATE::READ);
+		ser->addTool(t);
+	}
+	// Save
+	sirEdit::doSave();
 
-void sirEdit::doSave(bool blocking) {
+	// Call codegen
+	std::string path = filePath.substr(0, filePath.rfind("/"));
+	sirEdit::runCodegen({filePath, "-t", tool->getName(), "-b"}, path);
+
+	// Read data
+	string result;
+	{
+		auto fileSize = ifstream(path + "/specification.skill", ios::ate | ios::binary).tellg();
+		result.resize(fileSize);
+		ifstream in(path + "/specification.skill", ios::binary);
+		in.read(const_cast<char*>(&(result[0])), fileSize);
+	}
+
+	// Was global spec?
+	if(wasGlobal) {
+		ser->removeTool(const_cast<sirEdit::data::Tool*>(tool));
+		sirEdit::doSave();
+	}
+
+	// Return
+	return result;
+}
+
+extern void sirEdit::doSave(bool blocking) {
 	// Save function
 	auto toRunFunc = []() -> void {
 		char buffer[256];
@@ -41,16 +84,19 @@ void sirEdit::doSave(bool blocking) {
 	};
 
 	// TODO: Asyc
-	ser->prepareSave();
-	ser->save();
-	toRunFunc();
+	{
+		lock_guard<mutex> __lock__(saveMutex);
+		ser->prepareSave();
+		ser->save();
+		toRunFunc();
+	}
 }
 
 inline void loadFileThread(Gtk::Window* mainWindow, Gtk::Window* popup, Glib::RefPtr<Gio::File> file) {
 	outputFile = file;
 
 	// Create tmpfile
-	string fileName = tmpnam(nullptr); // TODO: replace tmpnam
+	string fileName = string(tmpnam(nullptr)) + ".sir";
 	filePath = fileName;
 	FILE* output = fopen(fileName.c_str(), "w");
 
@@ -90,19 +136,19 @@ inline void loadFileThread(Gtk::Window* mainWindow, Gtk::Window* popup, Glib::Re
 		}
 	});
 	cv.wait(lock);
-}
 
-extern void sirEdit::loadFile(Gtk::Window* window, Gtk::FileChooserNative* chooser) {
 	// Autosave
 	new thread([]() -> void {
 		if(ended)
 			return;
-		runInGui([]() -> void {
-			doSave(false);
+		sirEdit::runInGui([]() -> void {
+			sirEdit::doSave(false);
 		});
 		sleep(30);
 	});
+}
 
+extern void sirEdit::loadFile(Gtk::Window* window, Gtk::FileChooserNative* chooser) {
 	// Start loader
 	auto files = chooser->get_files();
 	if(files.size() != 1)
