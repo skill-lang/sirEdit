@@ -5,8 +5,6 @@
 #include <iostream>
 #include <list>
 
-#include "classInfo.hpp"
-
 #include "gui/startupWindow.hpp"
 
 #include <sirEdit/data/serialize.hpp>
@@ -74,4 +72,8 @@ int main(int args, char** argv) {
 	//Gtk::Window window;
 	//window.show_all();
 	//return gtkMain.run(window);
+	// Run and terminate
+	auto result = application->run(args, argv);
+	ended = true;
+	return result;
 }
