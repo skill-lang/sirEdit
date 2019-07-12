@@ -53,10 +53,13 @@ namespace sirEdit::data {
 			FieldMeta __meta;
 			std::unordered_map<std::string, std::vector<std::string>> __hints;
 			std::unordered_map<std::string, std::vector<std::string>> __restrictions;
+			std::vector<const Field*> __collide;
 
 		public:
 			Field() {}
-			Field(std::string name, std::string comment, FieldType type) : __name(std::move(name)), __comment(std::move(comment)), __type(std::move(type)) {}
+			Field(std::string name, std::string comment, FieldType type) : __name(std::move(name)), __comment(std::move(comment)), __type(std::move(type)) {
+				this->__meta.type = FieldMeta::META_TYPE::NORMAL;
+			}
 
 			const std::string& getName() const { return this->__name; }
 			const std::string& getComment() const { return this->__comment; }
@@ -64,12 +67,14 @@ namespace sirEdit::data {
 			const FieldMeta& getMeta() const { return this->__meta; }
 			const std::unordered_map<std::string, std::vector<std::string>>& getHints() const { return this->__hints; }
 			const std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() const { return this->__restrictions; }
+			const std::vector<const Field*> getCollide() const { return this->__collide; }
 			std::string& getName() { return this->__name; }
 			std::string& getComment() { return this->__comment; }
 			FieldType& getType() { return this->__type; }
 			FieldMeta& getMeta() { return this->__meta; }
 			std::unordered_map<std::string, std::vector<std::string>>& getHints() { return this->__hints; }
 			std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() { return this->__restrictions; }
+			std::vector<const Field*> getCollide() { return this->__collide; }
 
 			std::string printType() const;
 	};

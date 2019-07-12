@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <sirEdit/data/fields.hpp>
@@ -26,9 +27,10 @@ namespace sirEdit::data
 			std::string __metaTypeName = "<NOT SET>";
 			std::unordered_map<std::string, std::vector<std::string>> __hints;
 			std::unordered_map<std::string, std::vector<std::string>> __restrictions;
+			std::vector<const Type*> __collide;
 
 		public:
-			Type(const Type& type) : __name(type.__name), __comment(type.__comment) {}
+			Type(const Type& type) : __name(type.__name), __comment(type.__comment), __hints(type.__hints), __restrictions(type.__restrictions) {}
 			Type(std::string name, std::string comment) : __name(std::move(name)), __comment(std::move(comment)) {}
 			virtual ~Type() {}
 
@@ -45,6 +47,7 @@ namespace sirEdit::data
 			const std::string& getMetaTypeName() const { return this->__metaTypeName; }
 			const std::unordered_map<std::string, std::vector<std::string>>& getHints() const { return this->__hints; }
 			const std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() const { return this->__restrictions; }
+			const std::vector<const Type*>& getCollides() const { return this->__collide; }
 			std::string& getName() { return this->__name; }
 			std::string& getComment() { return this->__comment; }
 			std::vector<Type*>& getSubTypes() { return this->__subTypes; }
@@ -52,6 +55,7 @@ namespace sirEdit::data
 			std::string& getMetaTypeName() { return this->__metaTypeName; }
 			std::unordered_map<std::string, std::vector<std::string>>& getHints() { return this->__hints; }
 			std::unordered_map<std::string, std::vector<std::string>>& getRestrictions() { return this->__restrictions; }
+			std::vector<const Type*>& getCollides() { return this->__collide; }
 	};
 	class TypeWithFields : public Type {
 		private:
@@ -193,6 +197,30 @@ namespace sirEdit::data
 		auto isClass = [&type]() -> const std::vector<Field>& { return dynamic_cast<const TypeClass*>(&type)->getFields(); };
 		auto isEnum = [&type]() -> const std::vector<Field>& { return dynamic_cast<const TypeEnum*>(&type)->getFields(); };
 		return doBaseType(&type, isBase, isInterface, isClass, isEnum, isBase);
+	}
+
+	inline std::unordered_set<const Field*> listAllFields(const Type& type) {
+		// Add own fields
+		std::unordered_set<const Field*> result;
+		for(auto& i : getFields(type))
+			result.insert(&i);
+
+		// Add super fields
+		{
+			auto tmp = getSuper(type);
+			if(tmp != nullptr) {
+				auto tmp2 = listAllFields(*tmp);
+				result.insert(tmp2.begin(), tmp2.end());
+			}
+		}
+
+		// Add interfaces
+		for(auto& i : getInterfaces(type)) {
+			auto tmp = listAllFields(*i);
+			result.insert(tmp.begin(), tmp.end());
+		}
+
+		return result;
 	}
 
 	inline std::string Field::printType() const {

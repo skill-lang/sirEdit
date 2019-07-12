@@ -53,6 +53,43 @@ namespace sirEdit::data {
 				// Create new subtype information
 				for(auto& i : this->__types)
 					this->updateTypeInfo(i);
+
+				// Calculating collide of types
+				std::vector<Type*> onlySubtype; // Types that are at then end of the hirarchie
+				std::unordered_map<std::string, std::vector<Type*>> collideInfo;
+				for(auto& i : this->__types) {
+					if(i->getSubTypes().size() == 0)
+						onlySubtype.push_back(i);
+					auto tmp = collideInfo.find(i->getName());
+					if(tmp == collideInfo.end())
+						collideInfo[i->getName()] = {i};
+					else
+						tmp->second.push_back(i);
+				}
+				for(auto& i : collideInfo) // Set colide info for types
+					if(i.second.size() > 1)
+						for(auto& j : i.second) {
+							j->getCollides() = {i.second.begin(), i.second.end()};
+							j->getCollides().erase(std::find(j->getCollides().begin(), j->getCollides().end(), j));
+						}
+
+				// Calculating collide of fields
+				for(auto& i : onlySubtype) {
+					std::unordered_map<std::string, std::vector<Field*>> fieldName;
+					for(auto& j : listAllFields(*i)) { // Search for broken fields
+						auto tmp = fieldName.find(j->getName());
+						if(tmp == fieldName.end())
+							fieldName[j->getName()] = {const_cast<Field*>(j)};
+						else
+							fieldName[j->getName()].push_back(const_cast<Field*>(j));
+					}
+					for(auto& j : fieldName) // Updte fields
+						if(j.second.size() > 1)
+							for(auto& k : j.second) {
+								k->getCollide() = {j.second.begin(), j.second.end()};
+								k->getCollide().erase(std::find(k->getCollide().begin(), k->getCollide().end(), k));
+							}
+				}
 			}
 
 			virtual void addBaseType(Type* type) = 0;
@@ -81,6 +118,9 @@ namespace sirEdit::data {
 				this->__tools.erase(std::find(this->__tools.begin(), this->__tools.end(), tool));
 				this->removeBaseTool(tool);
 			}
+			void update() {
+				this->updateRelationships();
+			}
 			virtual void prepareSave() = 0;
 			virtual void save() = 0;
 
@@ -108,7 +148,7 @@ namespace sirEdit::data {
 			std::vector<std::function<void()>> __change_callback;
 
 			template<class T>
-			inline void updateCall(T& list) {
+			void updateCall(T& list) {
 				for(auto& i : list)
 					i();
 			}
@@ -158,6 +198,12 @@ namespace sirEdit::data {
 			}
 			void removeTool(const Tool& tool) {
 				this->__serializer.removeTool(const_cast<Tool*>(&tool));
+				updateCall(this->__change_callback);
+			}
+			void updateTool(const Tool& tool, std::string name, std::string description, std::string cmd) {
+				const_cast<Tool*>(&tool)->getName() = std::move(name);
+				const_cast<Tool*>(&tool)->getDescription() = std::move(description);
+				const_cast<Tool*>(&tool)->getCommand() = std::move(cmd);
 				updateCall(this->__change_callback);
 			}
 			void importTools(const std::vector<Tool*>& tools) {
