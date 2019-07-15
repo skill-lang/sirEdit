@@ -82,7 +82,7 @@ class EditTool : public Gtk::Popover {
 
 			// Set arguments
 			this->name.set_text(tool->getName());
-			this->description.set_text(tool->getCommand());
+			this->description.set_text(tool->getDescription());
 			this->cmd.set_text(tool->getCommand());
 
 			// Signals
@@ -104,7 +104,7 @@ class EditTool : public Gtk::Popover {
 			this->okaybutton.signal_clicked().connect([this]() -> void {
 				this->hide();
 				this->remove();
-				//TODO: Make operation
+				this->transactions.updateTool(*this->tool, this->name.get_text(), this->description.get_text(), this->cmd.get_text());
 			});
 		}
 };
@@ -121,7 +121,7 @@ class MainWindow {
 		Glib::RefPtr<Gio::File> __file;
 		Transactions __transitions;
 
-		unordered_map<string, int> __tabs;
+		unordered_map<Tool*, int> __tabs;
 		Gtk::Notebook* __notebook;
 
 		Gtk::ListBox* __toolsList;
@@ -140,9 +140,9 @@ class MainWindow {
 			closeButton->set_property("relief", Gtk::RELIEF_NONE);
 			closeButton->signal_clicked().connect([this, &tool]() -> void {
 				// Remove page
-				int tmp = this->__tabs[tool.getName()];
+				int tmp = this->__tabs[&tool];
 				this->__notebook->remove_page(tmp);
-				this->__tabs.erase(tool.getName());
+				this->__tabs.erase(&tool);
 
 				// Update tabs
 				for(auto& i : this->__tabs)
@@ -153,7 +153,7 @@ class MainWindow {
 			labelBox->pack_end(*closeButton);
 			labelBox->show_all();
 			auto tmp = this->__notebook->append_page(*content, *labelBox);
-			__tabs[tool.getName()] = tmp;
+			__tabs[&tool] = tmp;
 			this->__notebook->set_current_page(tmp);
 		}
 
@@ -178,6 +178,7 @@ class MainWindow {
 				for(auto& i : tools) {
 					Gtk::VBox* main = Gtk::manage(new Gtk::VBox());
 					{
+						// new tool
 						Gtk::HBox* top = Gtk::manage(new Gtk::HBox());
 						{
 							Gtk::Label* tmp = Gtk::manage(new Gtk::Label(i->getName()));
@@ -188,10 +189,10 @@ class MainWindow {
 							top->pack_start(*(button), true, true);
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->signal_clicked().connect([&i, this]() -> void {
-								if(this->__tabs.find(i->getName()) == this->__tabs.end())
+								if(this->__tabs.find(i) == this->__tabs.end())
 									this->__create_tab(*const_cast<Tool*>(i));
 								else
-									this->__notebook->set_current_page(this->__tabs[i->getName()]);
+									this->__notebook->set_current_page(this->__tabs[i]);
 								this->__toolsPopover->hide();
 							});
 						}
@@ -222,6 +223,8 @@ class MainWindow {
 							});
 							top->pack_start(*button, false, true);
 						}
+
+						// edit tool
 						{
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->signal_clicked().connect([button, i, this]() -> void {
@@ -233,17 +236,24 @@ class MainWindow {
 							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::EDIT, Gtk::ICON_SIZE_BUTTON))));
 							top->pack_start(*button, false, true);
 						}
+
+						// remove tool
 						{
 							Gtk::Button* button = Gtk::manage(new Gtk::Button());
 							button->set_relief(Gtk::RELIEF_NONE);
 							button->set_image(*(Gtk::manage(new Gtk::Image(Gtk::Stock::DELETE, Gtk::ICON_SIZE_BUTTON))));
 							button->signal_clicked().connect([i, this]() -> void {
+								if(this->__tabs.find(i) != this->__tabs.end())
+									this->__notebook->remove_page(this->__tabs[i]);
 								this->__transitions.removeTool(*i);
+								this->__event_toolButton_click();
 							});
 							top->pack_start(*button, false, true);
 						}
 						main->pack_start(*top, true, true);
 					}
+
+					// description
 					{
 						Gtk::Label* description = Gtk::manage(new Gtk::Label(i->getDescription()));
 						description->set_line_wrap_mode(Pango::WrapMode::WRAP_CHAR);
