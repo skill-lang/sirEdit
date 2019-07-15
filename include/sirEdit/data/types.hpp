@@ -226,6 +226,7 @@ namespace sirEdit::data
 	inline std::string Field::printType() const {
 		// Type parse
 		std::string result;
+		std::string end; // End of the printing
 		switch(this->__type.combination) {
 			case FieldType::TYPE_COMBINATION::SINGLE_TYPE:
 				if(this->__type.types.size() != 1)
@@ -240,20 +241,22 @@ namespace sirEdit::data
 					throw; // That sould never happen!
 				return std::move(this->__type.types[0]->getName() + "[" + std::to_string(this->__type.arraySize) + "]");
 			case FieldType::TYPE_COMBINATION::LIST:
-				result = "list";
+				result = "list<";
+				end = ">";
 				break;
-			case FieldType::TYPE_COMBINATION::SET:
-				result = "set";
+			case FieldType::TYPE_COMBINATION::SET: 
+				result = "set<";
+				end = ">";
 				break;
 			case FieldType::TYPE_COMBINATION::MAP:
-				result = "map";
+				result = "map<";
+				end = ">";
 				break;
 			default:
 				throw; // Unkown combination
 		}
 
-		// Insert template
-		result += "<";
+		// Insert type names
 		{
 			bool first = true;
 			for(auto& i : this->__type.types) {
@@ -263,7 +266,7 @@ namespace sirEdit::data
 				first = false;
 			}
 		}
-		result += ">";
+		result += end;
 
 		return result;
 	}
