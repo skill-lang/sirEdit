@@ -273,7 +273,9 @@ class Tab : public Gtk::HPaned
 			this->transactions.setFieldStatus(this->tool, *(this->currentType), *(field), state, [this, &id](const Type& type, const Field& field, FIELD_STATE tool_state, FIELD_STATE type_state) -> void {
 				this->fieldUpdate(*(this->fieldListData->get_iter(id)), tool_state, type_state);
 			}, [this, &id](const Type& type, TYPE_STATE tool_state, TYPE_STATE set_state) -> void {
-				this->typeUpdate(this->type_lookup.find(&type)->second, tool_state, set_state);
+				auto tmp = this->type_lookup.find(&type);
+				if(tmp != this->type_lookup.end())
+					this->typeUpdate(tmp->second, tool_state, set_state);
 			});
 		}
 
