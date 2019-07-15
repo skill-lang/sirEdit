@@ -23,7 +23,21 @@ static const std::string slash="/";
  */
 inline void escapeString(const string& toEscape, stringstream& stream) {
 	for(auto& i : toEscape) {
-		if(i == '$' || i == '\\' || i == ' ' || i == '"' || i == '\'' || i == ';' || i == '|' || i == '&' || i == '(' || i == ')' || i == '{' || i == '}' || i == '[' || i == ']')
+		if(i == '$'  ||
+		   i == '\\' ||
+		   i == ' '  ||
+		   i == '"'  ||
+		   i == '\'' ||
+		   i == ';'  ||
+		   i == '|'  ||
+		   i == '&'  ||
+		   i == '('  ||
+		   i == ')'  ||
+		   i == '{'  ||
+		   i == '}'  ||
+		   i == '['  ||
+		   i == ']'  ||
+		   i == '*')
 			stream << "\\" << i;
 		else if(i == '\t')
 			stream << "\\t";
