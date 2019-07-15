@@ -17,6 +17,7 @@ using namespace sirEdit::gui;
 
 
 extern string sirEdit_mainWindow_glade;
+extern std::string sirEdit_codegen;     /// Resource codegen code
 
 //
 // Export main
@@ -305,6 +306,29 @@ class MainWindow {
 					}
 			}
 		}
+		auto __listExports(Gtk::TreeView* tree) {
+			// Create export model with default entry
+			auto model = Gtk::TreeStore::create(exportModel);
+			{
+				auto tmp = *(model->append());
+				tmp[exportModel.data_id] = nullptr;
+				tmp[exportModel.data_name] = "-- ALL --";
+			}
+
+			// Add tool
+			for(auto& i : this->__serializer->getTools()) {
+				auto tmp = *(model->append());
+				tmp[exportModel.data_name] = i->getName();
+				tmp[exportModel.data_id] = i;
+			}
+			tree->append_column("Tool", exportModel.data_name);
+			tree->get_selection()->unselect_all();
+			tree->get_selection()->set_mode(Gtk::SelectionMode::SELECTION_MULTIPLE);
+			tree->set_model(model);
+
+			// Return model
+			return model;
+		}
 	public:
 		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
 			// Builder
@@ -338,11 +362,13 @@ class MainWindow {
 				this->__builder->get_widget("ExportButton", button);
 				this->__builder->get_widget("Export", dialog);
 				this->__builder->get_widget("ExportTools", tree);
-				button->signal_clicked().connect([dialog]() -> void {
-					// TODO: reset
+
+				// Open dialog
+				button->signal_clicked().connect([this, tree, dialog]() -> void {
+					auto model = this->__listExports(tree);
 					dialog->show_all();
 				});
-				exportExample(tree);
+				tree->set_search_column(exportModel.data_id);
 			}
 
 			// Tools pop-up
