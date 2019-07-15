@@ -119,6 +119,7 @@ class Overview : public Gtk::VBox {
 			// Create base structure
 			Gtk::VBox* typesSet;
 			Gtk::VBox* fieldsSet;
+			Gtk::VBox* typeSet;
 			{
 				this->clearSidebar();
 				this->sidebar.pack_start(*(createLabel(std::string("Name: ") + tool.getName())), false, false);
@@ -128,6 +129,8 @@ class Overview : public Gtk::VBox {
 				this->sidebar.pack_start(*typesSet, false, false);
 				fieldsSet = Gtk::manage(new Gtk::VBox());
 				this->sidebar.pack_start(*fieldsSet, false, false);
+				typeSet = Gtk::manage(new Gtk::VBox());
+				this->sidebar.pack_start(*typeSet, false, false);
 			}
 
 			// Add types
@@ -161,7 +164,36 @@ class Overview : public Gtk::VBox {
 					}
 			}
 
-			// TODO: Fileds
+			// Add fileds
+			{ // TODO: Sort
+				bool first = true;
+				for(auto& i : tool.getStatesFields())
+					for(auto& j : i.second)
+						if(j.second > FIELD_STATE::NO) {
+							if(first) {
+								first = false;
+								typeSet->pack_start(*(createLabel(std::string(" "))), false, false);
+								typeSet->pack_start(*(createLabel(std::string("Fields:"))), false, false);
+							}
+							const char* state;
+							switch(j.second) {
+								case FIELD_STATE::UNUSED:
+									state = "UNUSED";
+									break;
+								case FIELD_STATE::READ:
+									state = "READ";
+									break;
+								case FIELD_STATE::WRITE:
+									state = "WRITE";
+									break;
+								case FIELD_STATE::CREATE:
+									state = "CREATE";
+									break;
+								default:
+									throw; // That should never happen
+							}
+						}
+			}
 
 			this->sidebar.show_all();
 		}
@@ -222,7 +254,60 @@ class Overview : public Gtk::VBox {
 				}
 			}
 		}
-		// TODO: Show type
+		inline void renderTypeSidebar(const Type& type) {
+			// Base structure
+			Gtk::VBox* hints;
+			Gtk::VBox* types;
+			{
+				this->clearSidebar();
+				this->sidebar.pack_start(*(createLabel(std::string("Name: ") + type.getName())), false, false);
+				this->sidebar.pack_start(*(createLabel(std::string("Description:\n") + type.getComment())), false, false);
+				this->sidebar.pack_start(*(createLabel(std::string("Kind: ") + type.getMetaTypeName())), false, false);
+				hints = Gtk::manage(new Gtk::VBox());
+				this->sidebar.pack_start(*hints, false, false);
+				types = Gtk::manage(new Gtk::VBox());
+				this->sidebar.pack_start(*types, false, false);
+			}
+
+			// Generate hints
+			renderSidebarHints(type, *hints);
+
+			// Used in tools
+			{ // TODO: Sort
+				bool first = true;
+				for(auto& i : this->transactions.getData().getTools()) {
+					TYPE_STATE fs = i->getTypeTransitiveState(type);
+					if(fs > TYPE_STATE::NO) {
+						if(first) {
+							first = false;
+							types->pack_start(*(createLabel(std::string(" "))), false, false);
+							types->pack_start(*(createLabel(std::string("Tools:"))), false, false);
+						}
+						const char* state;
+						switch(fs) {
+							case TYPE_STATE::UNUSED:
+								state = "UNUSED";
+								break;
+							case TYPE_STATE::READ:
+								state = "READ";
+								break;
+							case TYPE_STATE::WRITE:
+								state = "WRITE";
+								break;
+							case TYPE_STATE::DELETE:
+								state = "DELETE";
+								break;
+							default:
+								throw; // That should never happen!
+						}
+						types->pack_start(*(createLabel(i->getName() + " : " + state)), false, false);
+					}
+				}
+			}
+
+			// Finalize
+			this->sidebar.show_all();
+		}
 		inline void renderFieldSidebar(const Field& field) {
 			// Base structure
 			Gtk::VBox* hints;
@@ -246,14 +331,17 @@ class Overview : public Gtk::VBox {
 				bool first = true;
 				for(auto& i : this->transactions.getData().getTools()) {
 					FIELD_STATE fs = i->getFieldTransitiveState(field);
-					if(fs > FIELD_STATE::UNUSED) {
+					if(fs > FIELD_STATE::NO) {
 						if(first) {
 							first = false;
 							types->pack_start(*(createLabel(std::string(" "))), false, false);
-							types->pack_start(*(createLabel(std::string("Types:"))), false, false);
+							types->pack_start(*(createLabel(std::string("Tools:"))), false, false);
 						}
 						const char* state;
 						switch(fs) {
+							case FIELD_STATE::UNUSED:
+								state = "UNUSED";
+								break;
 							case FIELD_STATE::READ:
 								state = "READ";
 								break;
@@ -865,6 +953,7 @@ class Overview : public Gtk::VBox {
 				if(type != nullptr) {
 					this->__current_type = type;
 					this->update_all();
+					this->renderTypeSidebar(*type);
 				}
 			});
 
