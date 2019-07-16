@@ -365,6 +365,74 @@ class MainWindow {
 					runExport("tool-" + i->getName() + ".skill", getSpec(i));
 			}
 		}
+
+		template<class TREE, class EXPORT>
+		void __exportMakefile(const TREE& tree, const EXPORT& exportDir) {
+			// List models
+			unordered_set<Tool*> tools;
+			for(auto& i : tree->get_selection()->get_selected_rows()) {
+				auto tmp = *(tree->get_model()->get_iter(i));
+				tools.insert(tmp[exportModel.data_id]);
+			}
+
+			// Found all?
+			if(tools.find(nullptr) != tools.end())
+				tools = {this->__serializer->getTools().begin(), this->__serializer->getTools().end()};
+
+			// Run export
+			auto runExport = [exportDir](const std::string& name, const std::string& content) -> void {
+				// Create file
+				auto tmp = exportDir->get_child(name);
+				if(!tmp)
+					return;
+
+				// Open file
+				auto io = tmp->replace();
+				if(!io)
+					return;
+
+				io->write(content.c_str(), content.size());
+				io->close();
+			};
+			auto toolName = [](const string& name) -> string {
+				string result = name;
+				while(result.find(" ") != string::npos)
+					result = move(result.replace(result.find(" "), 1, "-"));
+				while(result.find(":") != string::npos)
+					result = move(result.replace(result.find(":"), 1, "-"));
+				return result;
+			};
+
+			// export tools
+			{
+				size_t counter = 1;
+				for(auto& i : tools) {
+					runExport("tool" + to_string(counter) + ".skill", getSpec(i));
+					counter++;
+				}
+			}
+
+			// export makefile
+			runExport("codegen.jar", sirEdit_codegen);
+			{
+				// All target
+				string makefile = "all:";
+				for(auto& i : tools)
+					makefile += " " + toolName(i->getName());
+				makefile += "\n";
+
+				// Target tool
+				size_t counter = 1;
+				for(auto& i : tools) {
+					makefile += toolName(i->getName()) + ":\n\t" + i->parseCMD("tool" + to_string(counter) + ".skill") + "\n";
+					counter++;
+				}
+
+				// Write
+				runExport("Makefile", makefile);
+			}
+		}
+
 	public:
 		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
 			// Builder
@@ -414,7 +482,7 @@ class MainWindow {
 				// Run export
 				runButton->signal_clicked().connect([this, tree, typeToExport, files, dialog]() -> void {
 					if(typeToExport->get_active_text() == "Makefile")
-						; // TODO: Makefile
+						__exportMakefile(tree, files->get_file());
 					else
 						this->__exportSKilL(tree, files->get_file());
 					dialog->hide();
