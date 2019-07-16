@@ -306,6 +306,10 @@ class MainWindow {
 					}
 			}
 		}
+
+		//
+		// Export
+		//
 		auto __listExports(Gtk::TreeView* tree) {
 			// Create export model with default entry
 			auto model = Gtk::TreeStore::create(exportModel);
@@ -328,6 +332,38 @@ class MainWindow {
 
 			// Return model
 			return model;
+		}
+
+		template<class TREE, class EXPORT>
+		void __exportSKilL(const TREE& tree, const EXPORT& exportDir) {
+			// List models
+			unordered_set<Tool*> tools;
+			for(auto& i : tree->get_selection()->get_selected_rows()) {
+				auto tmp = *(tree->get_model()->get_iter(i));
+				tools.insert(tmp[exportModel.data_id]);
+			}
+
+			// Run export
+			auto runExport = [exportDir](const std::string& name, const std::string& content) -> void {
+				// Create file
+				auto tmp = exportDir->get_child(name);
+				if(!tmp)
+					return;
+
+				// Open file
+				auto io = tmp->replace();
+				if(!io)
+					return;
+
+				io->write(content.c_str(), content.size());
+				io->close();
+			};
+			for(auto& i : tools) {
+				if(i == nullptr)
+					runExport("spec.skill", getSpec(i));
+				else
+					runExport("tool-" + i->getName() + ".skill", getSpec(i));
+			}
 		}
 	public:
 		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
@@ -356,17 +392,32 @@ class MainWindow {
 
 			// Export
 			{
+				Gtk::ComboBoxText* typeToExport;
 				Gtk::Button* button;
+				Gtk::Button* runButton;
 				Gtk::Dialog* dialog;
 				Gtk::TreeView* tree;
+				Gtk::FileChooserButton* files;
 				this->__builder->get_widget("ExportButton", button);
+				this->__builder->get_widget("ExportRun", runButton);
 				this->__builder->get_widget("Export", dialog);
 				this->__builder->get_widget("ExportTools", tree);
+				this->__builder->get_widget("ExportTarget", files);
+				this->__builder->get_widget("ExportType", typeToExport);
 
 				// Open dialog
 				button->signal_clicked().connect([this, tree, dialog]() -> void {
 					auto model = this->__listExports(tree);
 					dialog->show_all();
+				});
+
+				// Run export
+				runButton->signal_clicked().connect([this, tree, typeToExport, files, dialog]() -> void {
+					if(typeToExport->get_active_text() == "Makefile")
+						; // TODO: Makefile
+					else
+						this->__exportSKilL(tree, files->get_file());
+					dialog->hide();
 				});
 				tree->set_search_column(exportModel.data_id);
 			}
