@@ -487,6 +487,29 @@ class MainWindow {
 						this->__exportSKilL(tree, files->get_file());
 					dialog->hide();
 				});
+
+				// Checker
+				{
+					auto checkerFunc = [runButton, files, tree]() -> void {
+						// Nothing selected
+						if(tree->get_selection()->get_selected_rows().size() == 0) {
+							runButton->set_sensitive(false);
+							return;
+						}
+
+						// No target
+						if(files->get_files().size() == 0) {
+							runButton->set_sensitive(false);
+							return;
+						}
+
+						// Everthing is okay
+						runButton->set_sensitive(true);
+					};
+					checkerFunc();
+					tree->get_selection()->signal_changed().connect(checkerFunc);
+					files->signal_file_set().connect(checkerFunc);
+				}
 				tree->set_search_column(exportModel.data_id);
 			}
 
