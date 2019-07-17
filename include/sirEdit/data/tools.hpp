@@ -8,21 +8,24 @@
 #include <sirEdit/data/types.hpp>
 
 namespace sirEdit::data {
+	/**
+	 * A tool
+	 */
 	class Tool {
 		private:
-			std::string __name;
-			std::string __description;
-			std::string __command;
+			std::string __name;        /// The name of the tool
+			std::string __description; /// The description of the tool
+			std::string __command;     /// The command to build the tool
 
-			std::unordered_map<const Field*, std::unordered_map<const Type*, FIELD_STATE>> __statesFields;
-			std::unordered_map<const Type*, std::tuple<uint64_t, TYPE_STATE>> __statesType;
+			std::unordered_map<const Field*, std::unordered_map<const Type*, FIELD_STATE>> __statesFields; /// the state of fields
+			std::unordered_map<const Type*, std::tuple<uint64_t, TYPE_STATE>> __statesType;                /// the state of types and references
 
 			//
 			// Calc transetive states
 			//
 			mutable std::unordered_map<const Field*, FIELD_STATE> __cache_fields; /// Cache for fields
-			mutable std::unordered_map<const Type*, bool> __cache_types_delete; /// Cache delete state for types
-			mutable std::unordered_map<const Type*, TYPE_STATE> __cache_types;  /// Cache state of types
+			mutable std::unordered_map<const Type*, bool> __cache_types_delete;   /// Cache delete state for types
+			mutable std::unordered_map<const Type*, TYPE_STATE> __cache_types;    /// Cache state of types
 
 			/**
 			 * Calculate the transitive state of a field.
@@ -259,23 +262,78 @@ namespace sirEdit::data {
 			}
 
 		public:
+			/**
+			 * Default constructor of a tool
+			 */
 			Tool() {}
+			/**
+			 * Creates a tool
+			 * @param name the name of the tool
+			 * @param description the description of the name
+			 * @param command the command of the tool
+			 */
 			Tool(std::string name, std::string description, std::string command) : __name(std::move(name)), __description(std::move(description)), __command(std::move(command)) {}
 
+			/**
+			 * Returns a reference of the name. Can be used as a setter.
+			 * @return reference to the name
+			 */
 			std::string& getName() { return this->__name; }
+			/**
+			 * Returns a reference of the description. Can be used as a setter.
+			 * @return reference to the description
+			 */
 			std::string& getDescription() { return this->__description; }
+			/**
+			 * Returns a reference of the command. Can be used as a setter.
+			 * @return reference to the command
+			 */
 			std::string& getCommand() { return this->__command; }
+			/**
+			 * Returns a reference of the sates of the fields. Can be used as a setter.
+			 * @return reference to the sates of the fields
+			 */
 			std::unordered_map<const Field*, std::unordered_map<const Type*, FIELD_STATE>>& getStatesFields() { return this->__statesFields; }
+			/**
+			 * Returns a reference of the states of the types. Can be used as a setter.
+			 * @return reference to the states of the types
+			 */
 			std::unordered_map<const Type*, std::tuple<uint64_t, TYPE_STATE>>& getStatesTypes() { return this->__statesType; }
+			/**
+			 * Returns the name of the tool.
+			 * @return the name
+			 */
 			const std::string& getName() const { return this->__name; }
+			/**
+			 * Returns the description of the tool.
+			 * @return the description
+			 */
 			const std::string& getDescription() const { return this->__description; }
+			/**
+			 * Returns the command of the tool.
+			 * @return the command
+			 */
 			const std::string& getCommand() const{ return this->__command; }
+			/**
+			 * Returns the states of the fields of the tool.
+			 * @return the states of the fields
+			 */
 			const std::unordered_map<const Field*, std::unordered_map<const Type*, FIELD_STATE>>& getStatesFields() const { return this->__statesFields; }
+			/**
+			 * Returns the states of the types of the tool.
+			 * @return the states of the types
+			 */
 			const std::unordered_map<const Type*, std::tuple<uint64_t, TYPE_STATE>>& getStatesTypes() const { return this->__statesType; }
 
 			//
 			// Get type/field states
 			//
+			/**
+			 * Returns the state of a field
+			 * @param field the field to lookup
+			 * @param type the type in witch the field was set
+			 * @return state of the field. When not set it will return FIELD_STATE::NO
+			 */
 			FIELD_STATE getFieldSetState(const Field& field, const Type& type) const {
 				// Search field
 				auto tmp_field = this->__statesFields.find(&field);
@@ -289,9 +347,19 @@ namespace sirEdit::data {
 				else
 					return tmp_type->second;
 			}
+			/**
+			 * Returns the transitive field state.
+			 * @param field the field to search
+			 * @return the calculated state
+			 */
 			FIELD_STATE getFieldTransitiveState(const Field& field) const {
 				return this->__transField(&field);
 			}
+			/**
+			 * Returns the set state of a type.
+			 * @param type the type to use
+			 * @return the set state. When not it will return TYPE_STATE::NO
+			 */
 			TYPE_STATE getTypeSetState(const Type& type) const {
 				// Search type
 				auto tmp = this->__statesType.find(&type);
@@ -300,6 +368,11 @@ namespace sirEdit::data {
 				else
 					return std::get<1>(tmp->second);
 			}
+			/**
+			 * Returns the calculated state of the type.
+			 * @param type the type to use
+			 * @return state of the type
+			 */
 			TYPE_STATE getTypeTransitiveState(const Type& type) const {
 				return this->__transType(&type);
 			}
@@ -307,6 +380,12 @@ namespace sirEdit::data {
 			//
 			// Set field/type state
 			//
+			/**
+			 * Set the state of a field
+			 * @param type the type where the field was set
+			 * @param field the field that should bet set
+			 * @param state the state that should be set
+			 */
 			void setFieldState(const Type& type, const Field& field, FIELD_STATE state) {
 				// Clear caches
 				this->__clearTypeCache(&type);
