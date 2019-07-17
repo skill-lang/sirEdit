@@ -5,7 +5,9 @@
 
 using namespace tao::pegtl;
 
+//
 // Language
+//
 struct TrueComment : public seq<one<'#'>, until<eolf>> {};
 
 struct SingelLineComment : public seq<string<'/', '/'>, until<eolf>, eolf> {};
@@ -17,13 +19,15 @@ struct Import : public seq<sor<TAO_PEGTL_STRING("import"), TAO_PEGTL_STRING("wit
 
 struct Document : public seq<star<TrueComment>, star<Import>, until<eof>> {};
 
+//
 // Parse
+//
 template<class RULE>
 struct Accepter : nothing<RULE> {};
 template<>
 struct Accepter<CString> {
 	template<class INPUT>
-	static void apply(const INPUT& in, std::list<std::string>& out) {
+	static void apply(const INPUT& in, std::list<std::string>& out) { // When a cstring was found add it to out
 		out.push_back(in.string());
 	}
 };

@@ -12,7 +12,7 @@ namespace sirEdit::data {
 	 */
 	class SKilL_Include {
 		private:
-			std::string __path; /// Folder to load
+			std::string __path;                      /// Folder to load
 			std::unordered_set<std::string> __files; /// List of the files
 
 			/**
@@ -38,6 +38,9 @@ namespace sirEdit::data {
 			 * @param path the tmp path to save the specification
 			 */
 			SKilL_Include(std::string path) : __path(std::move(path)) {}
+			/**
+			 * Delete old files
+			 */
 			~SKilL_Include() {
 				for(auto& i : this->__files)
 					this->__deleteFile(i);
