@@ -6,14 +6,25 @@
 #include <algorithm>
 
 namespace sirEdit::data {
+	/**
+	 * The helper class can copies the types and fields of a specification and can meld a specification to the current result.
+	 * This class allso supports the import of tools, to find the corosponding type and field.
+	 * Also it can be used to generte a tool specification with help of the import filters.
+	 */
 	class SpecModify {
 		private:
-			mutable std::unordered_map<const Type*, const Type*> oldToNewType;
-			mutable std::unordered_map<const Field*, const Field*> oldToNewField;
-			std::unordered_set<Field*> fields;
-			bool __hasCycle = false;
-			std::unordered_map<const Field*, std::vector<Field*>> requiredViews;
+			mutable std::unordered_map<const Type*, const Type*> oldToNewType;    /// Is a cache witch allows to look up old converted types to new ones.
+			mutable std::unordered_map<const Field*, const Field*> oldToNewField; /// Is a cache for the source of an old field to the equal new one.
+			std::unordered_set<Field*> fields;                                    /// A list of all added fields
+			bool __hasCycle = false;                                              /// Has interfaces has a cycle
+			std::unordered_map<const Field*, std::vector<Field*>> requiredViews;  /// Fields that need to be updated (view conent)
 
+			/**
+			 * Compares two types. Bouth types have to have the same hints, restrictions, name, kind and compareable super classes.
+			 * @param a first type to compare
+			 * @param b second type to compare
+			 * @return a equal enought for b (and the other way round too).
+			 */
 			bool compareType(const Type& a, const Type& b) const {
 				if(a.getName() != b.getName() ||
 					a.getMetaTypeName() != b.getMetaTypeName() ||
@@ -27,6 +38,13 @@ namespace sirEdit::data {
 				return true;
 			}
 
+			/**
+			 * Compares two fields. Bouth types have to have the same hints, restrictions, name, type, and meta data.
+			 * If it's a view field then the view has to be check too.
+			 * @param a first field to compare
+			 * @param b second field to compare
+			 * @return a equal enought for b (and the other way round too).
+			 */
 			bool compareField(const Field& a, const Field& b) const {
 				if(a.getHints() != b.getHints() ||
 					a.getRestrictions() != b.getRestrictions() ||
@@ -48,6 +66,12 @@ namespace sirEdit::data {
 				return true;
 			}
 
+			/**
+			 * Copies the type from source and set super as it's super type.
+			 * @param source the source to copy
+			 * @param super the super type to set
+			 * @return the new copied type.
+			 */
 			Type* typeCopy(const Type* source, Type* super) {
 				// Create new type
 				Type* result = doBaseType(source, [source]()-> Type* {
@@ -68,6 +92,11 @@ namespace sirEdit::data {
 				return result;
 			}
 
+			/**
+			 * Copy a field to an other
+			 * @param source the source field to copy
+			 * @param target the target to copy
+			 */
 			void fieldCopyTo(const Field& source, Field& target) {
 				// Copy basedata
 				target.getType() = source.getType();
@@ -107,6 +136,12 @@ namespace sirEdit::data {
 				}
 			}
 
+			/**
+			 * Checks if interface has a cycle.
+			 * @param typeList list of allrady added interfaces
+			 * @param interface the current interface
+			 * @return if this interface builds a cycle
+			 */
 			bool calcCycle(std::unordered_set<Type*>& typeList, TypeInterface* interface) {
 				if(typeList.find(interface) != typeList.end())
 					return true;
@@ -119,8 +154,13 @@ namespace sirEdit::data {
 			}
 
 		public:
-			std::vector<Type*> types;
+			std::vector<Type*> types; /// The copied new types
 
+			/**
+			 * Search a type, with is equal enought.
+			 * @param like the type with sould be used as key for the search.
+			 * @return the founded type or null
+			 */
 			const Type* findType(const Type& like) const {
 				// Try to use cache
 				{
@@ -144,6 +184,11 @@ namespace sirEdit::data {
 				return result;
 			}
 
+			/**
+			 * Search a the new filed witch is simular to like.
+			 * @param like the field that should be equal enought to be searched.
+			 * @return the founded new field or null.
+			 */
 			const Field* findField(const Field& like) const {
 				// Try to use the cache
 				{
@@ -167,6 +212,11 @@ namespace sirEdit::data {
 				return result;
 			}
 
+			/**
+			 * Copies a type as long as it doesn't exists allready.
+			 * @param reference the source type to copy
+			 * @return the new type
+			 */
 			Type* addType(const Type* reference) {
 				// Check if allready exists
 				auto res = this->findType(*reference);
@@ -187,6 +237,12 @@ namespace sirEdit::data {
 				return newType;
 			}
 
+			/**
+			 * Melt types from an other specification into this one. The types an fields get copied
+			 * @param toAdd the types to add
+			 * @param checkType function to contole import of specific types. Usefull to generate toolspecification.
+			 * @param checkField function to controle impport of a specific fields. Usefull to generatoe tool specificiations.
+			 */
 			void meltTypes(std::vector<const Type*> toAdd, std::function<bool(const Type*)> checkType = [](const Type* t) -> bool {return true; }, std::function<bool(const Field*)> checkField = [](const Field* t) -> bool {return true; }) {
 				// Add all types
 				for(auto i : toAdd)
@@ -220,8 +276,15 @@ namespace sirEdit::data {
 					}
 			}
 
+			/**
+			 * Result if interfaces build a cycle
+			 * @return true when interfaces build a cycle
+			 */
 			bool hasCycle() const { return this->__hasCycle; }
 
+			/**
+			 * When types are set outside add fields.
+			 */
 			void updateFields() {
 				for(auto& i : this->types) {
 					oldToNewType[i] = i;
@@ -230,6 +293,12 @@ namespace sirEdit::data {
 				}
 			}
 
+			/**
+			 * Import a tool
+			 * @param tool the tool to import
+			 * @param toolTypes a list of types that the tool uses
+			 * @return the new tool
+			 */
 			Tool parseTool(const Tool& tool, const std::vector<const Type*>& toolTypes) {
 				// Definitions
 				std::unordered_map<std::string, std::vector<Type*>> toolNames; // Find type names
@@ -453,8 +522,17 @@ namespace sirEdit::data {
 				return result;
 			}
 
+			/**
+			 * Export types to sir. Types are after this lost!
+			 * @return path to the sir file.
+			 */
 			std::string dropToSIR();
 
+			/**
+			 * Export types to skill file. Types are after this lost!
+			 * @return path to the skill file
+			 */
 			std::string dropToSKilL();
 	};
 }
+
