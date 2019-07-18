@@ -21,6 +21,13 @@ using namespace std;
 // Serializer (read/write)
 //
 
+/**
+ * Combines parts to a string. Requird for identifer
+ * @tparam SOURCE the source type where the fields are saved
+ * @param source the source data
+ * @param spliter when merge insert this betwean two string
+ * @return the merged string
+ */
 template<class SOURCE>
 inline std::string parseString(SOURCE* source, string spliter = "") {
 	std::string result;
@@ -34,6 +41,11 @@ inline std::string parseString(SOURCE* source, string spliter = "") {
 	}
 	return result;
 }
+/**
+ * Parse a comment to a string.
+ * @param comment the comment that should be parsed
+ * @return the comment as a string
+ */
 inline std::string parseComment(sir::Comment* comment) {
 	if(comment == nullptr)
 		return "";
@@ -57,6 +69,12 @@ inline std::string parseComment(sir::Comment* comment) {
 	return result;
 }
 
+/**
+ * Find the types in a sir type and call back the function with the field
+ * @tparam FUNC the function to callback
+ * @param type the type to search the fields
+ * @param func the function to callback
+ */
 template<class FUNC>
 inline void findFieldInSIR(sir::Type* type, FUNC func) {
 	std::string skillType = type->skillName();
@@ -70,6 +88,12 @@ inline void findFieldInSIR(sir::Type* type, FUNC func) {
 		throw std::invalid_argument(std::string("Unknown skill class type ") + skillType);
 }
 
+/**
+ * Generate a type with fields.
+ * @tparam SOURCE the source fields
+ * @param source the source sir type
+ * @return the new generated type with fields
+ */
 template<class SOURCE>
 inline sirEdit::data::TypeWithFields _loadFields(SOURCE* source) {
 	if(source == nullptr)
@@ -92,6 +116,11 @@ inline sirEdit::data::TypeWithFields _loadFields(SOURCE* source) {
 	}
 	return sirEdit::data::TypeWithFields(parseString(source->getName()->getParts()), parseComment(source->getComment()), std::move(fields));
 }
+/**
+ * Transpose sir type to internal type
+ * @param uf the source type
+ * @return the created type
+ */
 inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 	std::string skillType = uf.skillName();
 	sirEdit::data::Type* result;
@@ -137,6 +166,13 @@ inline sirEdit::data::Type* genBaseType(sir::UserdefinedType& uf) {
 	return result;
 }
 
+/**
+ * Update the field data with type information, ...
+ * @param type the type to update
+ * @param sirType the source sir type
+ * @param fields add mapping from internal field to sir field
+ * @param inverses add mappring from sir field to internal type
+ */
 inline void updateFields(Type* type, sir::Type* sirType, unordered_map<Field*, sir::FieldLike*>& fields, unordered_map<sir::FieldLike*, Field*>& inverses) {
 	// Find fields
 	TypeWithFields* twf = dynamic_cast<TypeWithFields*>(type);
@@ -159,6 +195,12 @@ inline void updateFields(Type* type, sir::Type* sirType, unordered_map<Field*, s
 	}
 }
 
+/**
+ * Make internal representation of buildin types
+ * @param type the source sir type
+ * @param typeInverse cache for types
+ * @return the new generated/cached type
+ */
 inline Type* addBuildinType(sir::Type* type, unordered_map<sir::Type*, Type*>& typeInverse) {
 	// Check type
 	if(dynamic_cast<sir::UserdefinedType*>(type) != nullptr)
@@ -174,6 +216,13 @@ inline Type* addBuildinType(sir::Type* type, unordered_map<sir::Type*, Type*>& t
 	typeInverse[type] = tmp;
 	return tmp;
 }
+/**
+ * Updates field data like type
+ * @param field the field to update
+ * @param fields the internal field maped to sir field
+ * @param fieldsInerse mapping from internal fiedl to sir field
+ * @param typeInverse the mappting from sir field to internal field
+ */
 inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fields, unordered_map<sir::FieldLike*, Field*>& fieldInverse, unordered_map<sir::Type*, Type*>& typeInverse) {
 	// Find field
 	sir::FieldLike* orignalField = nullptr;
@@ -263,6 +312,14 @@ inline void updateField(Field& field, unordered_map<Field*, sir::FieldLike*>& fi
 	}
 }
 
+/**
+ * Supports to add interfaces
+ * @tparam TYPE1 the type of internal type to add the interfaces
+ * @tparam TYPE2 the type of the sir type
+ * @param type the type to update
+ * @param types mapping from internal type to sirType
+ * @param typeInverse mapping from sir type to internal type
+ */
 template<class TYPE1, class TYPE2>
 inline void _addInterfacesHelper(TYPE1* type, unordered_map<Type*, sir::Type*>& types, unordered_map<sir::Type*, Type*>& typeInverse) {
 	// Check
@@ -292,6 +349,12 @@ inline void _addInterfacesHelper(TYPE1* type, unordered_map<Type*, sir::Type*>& 
 			type->getInterfaces().push_back(tmp2);
 		}
 }
+/**
+ * Add interfaces to a type
+ * @param type the type to add
+ * @param types mapping from internal type to sir type
+ * @param typeInverse mapping from sir type to internal type
+ */
 inline void addInterfaces(Type& type, unordered_map<Type*, sir::Type*>& types, unordered_map<sir::Type*, Type*>& typeInverse) {
 	doBaseType(type, []() -> void {}, [&type, &types, &typeInverse]() -> void {
 		_addInterfacesHelper<TypeInterface, sir::InterfaceType>(dynamic_cast<TypeInterface*>(&type), types, typeInverse);
@@ -301,24 +364,34 @@ inline void addInterfaces(Type& type, unordered_map<Type*, sir::Type*>& types, u
 }
 
 namespace {
+	/**
+	 * Serializer implementation of sir
+	 * export of types not possible. Export of fields even less.
+	 */
 	class SerializerSIR : public Serializer
 	{
 		private:
-			SkillFile* sf;
-			unordered_map<Type*, sir::Type*> types;
-			unordered_map<sir::Type*, Type*> typesInverse;
-			unordered_map<Tool*, sir::Tool*> tools;
-			unordered_map<Field*, sir::FieldLike*> field;
-			unordered_map<sir::FieldLike*, Field*> fieldInverse;
+			SkillFile* sf;                                       /// Serializer that have to do things
+			unordered_map<Type*, sir::Type*> types;              /// mapping from internal type to sir type
+			unordered_map<sir::Type*, Type*> typesInverse;       /// mapping from sir type to internal type
+			unordered_map<Tool*, sir::Tool*> tools;              /// mapping from internal tool to sir tool
+			unordered_map<Field*, sir::FieldLike*> field;        /// mapping from internal field to sir field
+			unordered_map<sir::FieldLike*, Field*> fieldInverse; /// mapping from sir field to internal field
 
-			list<Tool*> toAdd;
-			list<sir::Tool*> toRemove;
-			list<Type*> addType;
+			list<Tool*> toAdd;                                   /// List of tools to add
+			list<sir::Tool*> toRemove;                           /// List of tools to remove
+			list<Type*> addType;                                 /// Types to add
 
-			list<Type*> saveAddType;
-			unordered_map<Tool*, sir::Tool*> saveTools;
-			unordered_map<Tool*, Tool> saveToolData;
+			list<Type*> saveAddType;                             /// Buffer for types that have to saved
+			unordered_map<Tool*, sir::Tool*> saveTools;          /// Buffers tool mapping
+			unordered_map<Tool*, Tool> saveToolData;             /// Buffer for tool data
 
+			/**
+			 * Update super entry
+			 * @tparam TYPE the internal type
+			 * @tparam SOURCE the source type of lists of sir types
+			 * @param source the source that should upate it's super
+			 */
 			template<class TYPE, class SOURCE>
 			void addSuper(const SOURCE& source) {
 				for(auto& i : source) {
@@ -333,9 +406,19 @@ namespace {
 				}
 			}
 
+			/**
+			 * Generates a sir string
+			 * @param source the source string
+			 * @return the sir string
+			 */
 			auto newSirString(const std::string& source) {
 				return this->sf->strings->add(source.c_str(), source.size());
 			}
+			/**
+			 * Generates a a sir comment.
+			 * @param comment the source comment to save
+			 * @return the sir comment
+			 */
 			auto newSirComment(const std::string& comment) {
 				auto result = this->sf->Comment->add();
 				auto tmp = new skill::api::Array<skill::api::String>(1);
@@ -343,6 +426,11 @@ namespace {
 				result->setText(tmp);
 				return result;
 			}
+			/**
+			 * Generates a sir identifer
+			 * @param source the source name of the identifier
+			 * @return the identifier
+			 */
 			sir::Identifier* newSirIdentifier(const std::string& source) {
 				auto name = this->newSirString(source);
 				auto part = new skill::api::Array<::skill::api::String>(1);
@@ -352,6 +440,13 @@ namespace {
 				result->setParts(part);
 				return result;
 			}
+			/**
+			 * Set name, comment, restrictions and hints
+			 * @tparam SOURCE the source internal type
+			 * @tparam TARGET the target sir type
+			 * @param source the source type
+			 * @param target the target type
+			 */
 			template<class SOURCE, class TARGET>
 			void doDefault(SOURCE* source, TARGET* target) {
 				// Add name and comment
@@ -389,6 +484,11 @@ namespace {
 				}
 			}
 
+			/**
+			 * Generates a sir type
+			 * @param type the source type to copy
+			 * @return the new sir type
+			 */
 			sir::Type* addSirType(Type* type) {
 				// Check if instance allready exists
 				{
@@ -430,6 +530,10 @@ namespace {
 				return result;
 			}
 
+			/**
+			 * Updates the super types and internfaces
+			 * @param type the source internal type to update sir type
+			 */
 			void updateType(Type* type) {
 				sir::Type* sirType = this->types[type];
 				// Update content
@@ -452,6 +556,10 @@ namespace {
 			}
 
 		public:
+			/**
+			 * Open a sir file
+			 * @param path the path to the file to open/create
+			 */
 			SerializerSIR(std::string path) {
 				// Open file
 				if(std::ifstream(path).good())
@@ -580,6 +688,9 @@ namespace {
 				// Run general updates
 				this->updateRelationships();
 			}
+			/**
+			 * remove serializer, types and tools
+			 */
 			~SerializerSIR() {
 				delete this->sf;
 
@@ -757,14 +868,23 @@ namespace {
 						forCMDField.clear();
 
 						// Bugfix for interfaces
-						for(auto& j : this->types) {
-							if(i.second.getTypeTransitiveState(*j.first) < TYPE_STATE::READ)
-								continue;
-							auto nothing = []() -> void {};
-							doBaseType(j.first, nothing, [&i, j]() -> void {
-								for(auto& k : getFields(*j.first))
-									i.second.setFieldState(*j.first, k, FIELD_STATE::READ);
-							}, nothing, nothing, nothing);
+						{
+							bool updated = true;
+							while(updated) {
+								updated = false;
+								for(auto& j : this->types) {
+									if(i.second.getTypeTransitiveState(*j.first) < TYPE_STATE::READ)
+										continue;
+									auto nothing = []() -> void {};
+									doBaseType(j.first, nothing, [&i, j, &updated]() -> void {
+										for(auto& k : getFields(*j.first)) {
+											if(i.second.getFieldTransitiveState(k) < FIELD_STATE::UNUSED)
+												updated = true;
+											i.second.setFieldState(*j.first, k, FIELD_STATE::READ);
+										}
+									}, nothing, nothing, nothing);
+								}
+							}
 						}
 
 						// Set data
