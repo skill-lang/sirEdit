@@ -16,58 +16,51 @@ using namespace sirEdit::data;
 using namespace sirEdit::gui;
 
 
-extern string sirEdit_mainWindow_glade;
+extern string sirEdit_mainWindow_glade; /// Resource main window data
 extern std::string sirEdit_codegen;     /// Resource codegen code
 
 //
 // Export main
 //
-
+/**
+ * Model for the export
+ */
 class ExportModel : public Gtk::TreeModel::ColumnRecord
 {
 	public:
-		Gtk::TreeModelColumn<Tool*> data_id;
-		Gtk::TreeModelColumn<Glib::ustring> data_name;
+		Gtk::TreeModelColumn<Tool*> data_id;           /// The referenced tool
+		Gtk::TreeModelColumn<Glib::ustring> data_name; /// The name of the tool
 
 		ExportModel() {
 			this->add(data_id);
 			this->add(data_name);
 		}
 };
-static ExportModel exportModel;
-
-inline void exportExample(Gtk::TreeView* tree) {
-	auto model = Gtk::TreeStore::create(exportModel);
-	{
-		auto tmp = *(model->append());
-		tmp[exportModel.data_name] = "-- ALL --";
-	}
-
-	{
-		auto tmp = *(model->append());
-		tmp[exportModel.data_name] = "Werkzeug1";
-	}
-	tree->set_model(model);
-	tree->append_column("Tool", exportModel.data_name);
-	tree->get_selection()->set_mode(Gtk::SelectionMode::SELECTION_MULTIPLE);
-}
+static ExportModel exportModel; /// Instance of a export model
 
 //
 // Edit tool
 //
-
+/**
+ * Edit dialog of a type
+ */
 class EditTool : public Gtk::Popover {
 	private:
-		Gtk::VBox layer;
-		Gtk::Entry name;
-		Gtk::Entry description;
-		Gtk::Entry cmd;
-		Gtk::Button okaybutton = move(Gtk::Button(Gtk::StockID("gtk-apply")));
+		Gtk::VBox layer;                                                 /// Layout
+		Gtk::Entry name;                                                 /// The name of the tool to edit
+		Gtk::Entry description;                                          /// The description of the tool to edit
+		Gtk::Entry cmd;                                                  /// The command to build the tool to edit
+		Gtk::Button okaybutton = Gtk::Button(Gtk::StockID("gtk-apply")); /// the okay button
 
-		Tool* tool;
-		Transactions& transactions;
+		Tool* tool;                                                      /// The tool to ecit
+		Transactions& transactions;                                      /// To notify the history to update
 
 	public:
+		/**
+		 * Create a edit tool
+		 * @param tool the tool to edit
+		 * @param transactions the history to notify
+		 */
 		EditTool(Tool* tool, Transactions& transactions) : tool(tool), transactions(transactions) {
 			// Basic layout
 			this->add(this->layer);
@@ -113,24 +106,30 @@ class EditTool : public Gtk::Popover {
 //
 // Main Window
 //
-
+/**
+ * The main window of the application
+ */
 class MainWindow {
 	private:
-		Glib::RefPtr<Gtk::Builder> __builder;
+		Glib::RefPtr<Gtk::Builder> __builder; /// The build source of the gui
 
-		unique_ptr<Serializer> __serializer;
-		Glib::RefPtr<Gio::File> __file;
-		Transactions __transitions;
+		unique_ptr<Serializer> __serializer;  /// The serializer that is used
+		Glib::RefPtr<Gio::File> __file;       /// The external file to save
+		Transactions __transitions;           /// The global history
 
-		unordered_map<Tool*, int> __tabs;
-		Gtk::Notebook* __notebook;
+		unordered_map<Tool*, int> __tabs;     /// Mapping tool to tab index (to delete)
+		Gtk::Notebook* __notebook;            /// The notebook where the tabs are saved
 
-		Gtk::ListBox* __toolsList;
-		Gtk::Popover* __toolsPopover;
+		Gtk::ListBox* __toolsList;            /// A listing with the tools
+		Gtk::Popover* __toolsPopover;         /// The tools popover
 
 		//
 		// Tab management
 		//
+		/**
+		 * Creates a new tab for a tool
+		 * @param tool the tool tab
+		 */
 		void __create_tab(Tool& tool) {
 			Gtk::HBox* labelBox = Gtk::manage(new Gtk::HBox());
 			Gtk::Label* label = Gtk::manage(new Gtk::Label(tool.getName()));
@@ -161,6 +160,9 @@ class MainWindow {
 		//
 		// Event
 		//
+		/**
+		 * The tool button clicke. Create list.
+		 */
 		void __event_toolButton_click() {
 			// Clear list
 			{
@@ -310,6 +312,11 @@ class MainWindow {
 		//
 		// Export
 		//
+		/**
+		 * Generate tools list
+		 * @param tree the tree to use
+		 * @return the created model
+		 */
 		auto __listExports(Gtk::TreeView* tree) {
 			// Create export model with default entry
 			auto model = Gtk::TreeStore::create(exportModel);
@@ -334,6 +341,13 @@ class MainWindow {
 			return model;
 		}
 
+		/**
+		 * To export to skill files
+		 * @tparam TREE the type of tree to get data
+		 * @tparam EXPORT the type of output target
+		 * @param tree the tree with the data
+		 * @parma exportDir the export dir to export files
+		 */
 		template<class TREE, class EXPORT>
 		void __exportSKilL(const TREE& tree, const EXPORT& exportDir) {
 			// List models
@@ -366,6 +380,13 @@ class MainWindow {
 			}
 		}
 
+		/**
+		 * To export to makefile
+		 * @tparam TREE the type of tree to get data
+		 * @tparam EXPORT the type of output target
+		 * @param tree the tree with the data
+		 * @parma exportDir the export dir to export files
+		 */
 		template<class TREE, class EXPORT>
 		void __exportMakefile(const TREE& tree, const EXPORT& exportDir) {
 			// List models
@@ -434,6 +455,11 @@ class MainWindow {
 		}
 
 	public:
+		/**
+		 * Create the main window
+		 * @param serializer the Serializer to use
+		 * @param fiel the to output data
+		 */
 		MainWindow(unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) : __transitions(*serializer) {
 			// Builder
 			this->__builder = Gtk::Builder::create();
@@ -600,7 +626,7 @@ class MainWindow {
 		}
 };
 
-static shared_ptr<MainWindow> mainWindow;
+static shared_ptr<MainWindow> mainWindow; /// The main window
 
 extern void sirEdit::gui::openMainWindow(std::unique_ptr<sirEdit::data::Serializer> serializer, Glib::RefPtr<Gio::File> file) {
 	mainWindow = move(make_shared<MainWindow>(std::move(serializer), file));
