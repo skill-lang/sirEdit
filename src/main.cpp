@@ -33,19 +33,11 @@ namespace sirEdit {
 volatile bool ended = false;
 
 int main(int args, char** argv) {
-	// Test Sir
-	/*SkillFile* file = SkillFile::read("skill.sir");
-	auto _tmp = file->UserdefinedType->allObjects();
-	auto& tmp = *_tmp;
-	while(tmp.hasNext()) {
-		cout << getName(*static_cast<sir::UserdefinedType*>(&(*tmp))) << endl;
-		++tmp;
-	}*/
-
 	// GIO application
 	auto application = Gtk::Application::create("de.marko10-000.sirEdit");
 	sirEdit::mainApplication = application.get();
 	application->signal_activate().connect([]() -> void {
+		// Dispacher func for function call
 		sirEdit::dispatcher = new Glib::Dispatcher();
 		sirEdit::dispatcher->connect([]() -> void {
 			// Get func
@@ -61,17 +53,11 @@ int main(int args, char** argv) {
 			// Run func
 			func();
 		});
+
+		// Open main dialog
 		sirEdit::gui::runStartupWindow();
 	});
-	auto reuslt = application->run(args, argv);
-	ended = true;
-	return reuslt;
 
-	// GTK startup
-	//Gtk::Main gtkMain(args, argv);
-	//Gtk::Window window;
-	//window.show_all();
-	//return gtkMain.run(window);
 	// Run and terminate
 	auto result = application->run(args, argv);
 	ended = true;
