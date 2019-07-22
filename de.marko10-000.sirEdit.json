@@ -6,14 +6,14 @@
 	"command": "/app/bin/sirEdit",
 	"writable-sdk": true,
 	"finish-args": [
-        "--require-version=1.0.0",
-        "--device=dri",
-        "--share=ipc",
-        "--socket=x11",
-        "--socket=wayland",
-        "--talk-name=org.gtk.vfs.*",
-        "--talk-name=org.gnome.SettingsDaemon.Color",
-	"--own-name=de.marko10-000.sirEdit"
+		"--require-version=1.0.0",
+		"--device=dri",
+		"--share=ipc",
+		"--socket=x11",
+		"--socket=wayland",
+		"--talk-name=org.gtk.vfs.*",
+		"--talk-name=org.gnome.SettingsDaemon.Color",
+		"--own-name=de.marko10-000.sirEdit"
 	],
 	"modules": [
 		{
@@ -159,18 +159,53 @@
 			]
 		},
 		{
-			"name": "sirEdit",
-			"buildsystem": "meson-ninja",
+			"name": "gtest",
 			"sources": [
 				{
-					"type": "file",
+					"type": "archive",
+					"url": "https://github.com/google/googletest/archive/release-1.8.1.tar.gz",
+					"sha256": "9bf1fe5182a604b4135edc1a425ae356c9ad15e9b23f9f12a02e80184c3a249c"
+				}
+			],
+			"buildsystem": "cmake-ninja"
+		},
+		{
+			"name": "pegtl",
+			"sources": [
+				{
+					"type": "archive",
+					"url": "https://github.com/taocpp/PEGTL/archive/2.8.0.tar.gz",
+					"sha256": "655197f9ff543fb6319cec9b86bb34147dd54c42dde78b89ff93d15c762d5f73"
+				}
+			],
+			"buildsystem": "cmake-ninja"
+		},
+		{
+			"name": "sirEdit",
+			"buildsystem": "meson",
+			"sources": [
+				{
+					"type": "dir",
 					"path": "."
 				},
 				{
 					"type": "shell",
 					"commands": [
 						"ln -s /app/lib/libgtkmm-3.0.a /usr/lib/libgtkmm-3.0.a",
-						"ls -la /usr/lib/libgtkmm-3.0.a"
+						"ls -la /usr/lib/libgtkmm-3.0.a",
+						"rm -rf subprojects/cppCommon"
+					]
+				},
+				{
+					"type": "git",
+					"url": "https://github.com/skill-lang/cppCommon",
+					"dest": "subprojects/cppCommon"
+				},
+				{
+					"type": "shell",
+					"commands": [
+						"cp -fv CMakeLists_skill.txt subprojects/cppCommon/CMakeLists.txt",
+						"java -jar data/codegen.jar sirSpec/sir.skill -L cpp --package sir -o sir"
 					]
 				}
 			]
