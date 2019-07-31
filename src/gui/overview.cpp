@@ -7,6 +7,132 @@
 
 using namespace sirEdit::data;
 
+//
+// Dependencie graph
+//
+
+class ImageRender : public Gtk::Widget
+{
+	private:
+		Cairo::RefPtr<Cairo::ImageSurface> __surface;
+
+		Glib::RefPtr<Gdk::Window> __refGdkWindow;
+
+	public:
+		ImageRender() {
+			this->set_has_window(true);
+		}
+
+		void loadImage(std::string path) {
+			this->__surface = Cairo::ImageSurface::create_from_png(path);
+			this->queue_resize();
+			this->queue_draw();
+		}
+
+	protected:
+		//
+		// Size
+		//
+		Gtk::SizeRequestMode get_request_mode_vfunc() const override {
+			return Gtk::SizeRequestMode::SIZE_REQUEST_CONSTANT_SIZE;
+		}
+		void get_preferred_width_vfunc(int& minimum_width, int& natural_width) const override {
+			if(this->__surface)
+				minimum_width = this->__surface->get_width();
+			else
+				minimum_width = 0;
+			natural_width = minimum_width;
+		}
+		void get_preferred_height_for_width_vfunc(int width, int& minimum_height, int& natural_height) const override {
+			this->get_preferred_height_vfunc(minimum_height, natural_height);
+		}
+		void get_preferred_height_vfunc(int& minimum_height, int& natural_height) const override {
+			if(this->__surface)
+				minimum_height = this->__surface->get_height();
+			else
+				minimum_height = 0;
+			natural_height = minimum_height;
+		}
+		void get_preferred_width_for_height_vfunc(int height, int& minimum_width, int& natural_width) const override {
+			this->get_preferred_width_vfunc(minimum_width, natural_width);
+		}
+
+		void on_realize() override {
+			this->set_realized();
+			//if(!this->__refGdkWindow)
+			{
+				//Create the GdkWindow
+
+				GdkWindowAttr attributes;
+				memset(&attributes, 0, sizeof(attributes));
+
+				Gtk::Allocation allocation = get_allocation();
+
+				//Set initial position and size of the Gdk::Window
+				attributes.x = allocation.get_x();
+				attributes.y = allocation.get_y();
+				attributes.width = allocation.get_width();
+				attributes.height = allocation.get_height();
+
+				attributes.event_mask = this->get_events() | Gdk::EXPOSURE_MASK;
+				attributes.window_type = GDK_WINDOW_CHILD;
+				attributes.wclass = GDK_INPUT_OUTPUT;
+
+				this->__refGdkWindow = Gdk::Window::create(this->get_parent_window(), &attributes, GDK_WA_X | GDK_WA_Y);
+				set_window(this->__refGdkWindow);
+
+				//make the widget receive expose events
+				this->__refGdkWindow->set_user_data(this->gobj());
+			}
+		}
+		void on_unrealize() override {
+			this->set_realized();
+		}
+		void on_size_allocate(Gtk::Allocation& allocation) override {
+			this->set_allocation(allocation);
+		}
+
+		//
+		// Draw
+		//
+		bool on_draw(const Cairo::RefPtr<Cairo::Context>& cr) override {
+			if(this->__surface) {
+				cr->save();
+				cr->set_source(this->__surface, 0, 0);
+				cr->rectangle(0, 0, this->__surface->get_width(), this->__surface->get_height());
+				cr->fill();
+				cr->restore();
+			}
+			return true;
+		}
+};
+
+class DependencieGraph : public Gtk::VBox {
+	private:
+		ImageRender __renderer;
+		Gtk::ScrolledWindow __scrollable;
+
+		Gtk::Button __update;
+
+	public:
+		DependencieGraph() {
+			// Layout
+			this->__update = Gtk::Button("Update");
+			this->__scrollable.add(this->__renderer);
+			this->pack_start(this->__update, false, true);
+			this->pack_end(this->__scrollable, true, true);
+
+			// Button
+			this->__update.signal_clicked().connect([this]() -> void {
+				this->__renderer.loadImage("test.png"); // TODO: Calculate and draw correct diagram
+			});
+		}
+};
+
+//
+// Overview
+//
+
 class ToolModel : public Gtk::TreeModel::ColumnRecord
 {
 	public:
@@ -98,6 +224,8 @@ class Overview : public Gtk::VBox {
 		Glib::RefPtr<Gtk::TreeStore> field_store;
 
 		Gtk::VBox sidebar;
+
+		DependencieGraph graph;
 
 		//
 		// Render sidebar
@@ -864,7 +992,7 @@ class Overview : public Gtk::VBox {
 		Overview(Transactions& transactions) : Gtk::VBox(), transactions(transactions) {
 			// Init Stack
 			this->stack.add(this->tool_paned, "Tool Overview", "Tool Overview");
-			this->stack.add(*Gtk::manage(new Gtk::HBox()), "Tool Relations", "Tool Relations"); // TODO: tool relations
+			this->stack.add(this->graph, "Tool Relations", "Tool Relations");
 			this->stack_switcher.set_stack(this->stack);
 			{
 				Gtk::Alignment* tmp = Gtk::manage(new Gtk::Alignment());
