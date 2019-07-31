@@ -2,9 +2,14 @@
 #include <sirEdit/data/serialize.hpp>
 #include <gtkmm.h>
 #include <unordered_set>
+#include <stdio.h>
+#include <fstream>
+#include <functional>
+#include <iostream>
 
 #include <sirEdit/main.hpp>
 
+using namespace sirEdit;
 using namespace sirEdit::data;
 
 //
@@ -107,15 +112,276 @@ class ImageRender : public Gtk::Widget
 		}
 };
 
+/**
+ * Check if subset is a subset of superset.
+ * @param subset the subset to check
+ * @param superset the source subset
+ * @return true if subset is a subset of a superset
+ */
+bool subset(const auto& subset, const auto& superset) {
+	for(auto& i : subset)
+		if(superset.find(i) == superset.end())
+			return false;
+	return true;
+}
+
+/**
+ * Bind tools for hashing and comparision
+ */
+struct ToolBinding {
+	Tool tool;
+
+	bool operator ==(const ToolBinding& tool) const {
+		if(tool.tool.getStatesFields().size() != this->tool.getStatesFields().size())
+			return false;
+		for(auto& i : tool.tool.getStatesFields())
+			if((tool.tool.getFieldTransitiveState(*(i.first)) >= FIELD_STATE::READ) != (this->tool.getFieldTransitiveState(*(i.first)) >= FIELD_STATE::READ))
+				return false;
+		return true;
+	}
+};
+template<>
+struct std::hash<ToolBinding> {
+	size_t operator()(const ToolBinding& tool) const {
+		size_t result = 0;
+		std::hash<const Field*> hasher;
+		for(auto& i : tool.tool.getStatesFields())
+			result ^= hasher(i.first);
+		return result;
+	}
+};
+
+/**
+ * A Edge of a graph
+ */
+struct Edge {
+	ToolBinding from; /// Source state
+	const Tool* tool; /// Tool (edge info)
+	ToolBinding to;   /// Target state
+
+	bool operator ==(const Edge& edge) const {
+		return this->tool == edge.tool && this->from == edge.from && this->to == edge.to;
+	}
+};
+template<>
+struct std::hash<Edge> {
+	size_t operator()(const Edge& edge) const {
+		return std::hash<ToolBinding>()(edge.from) ^ std::hash<const Tool*>()(edge.tool) ^ std::hash<ToolBinding>()(edge.to);
+	}
+};
+
 class DependencieGraph : public Gtk::VBox {
 	private:
+		struct NodeInfo {
+			std::unordered_map<ToolBinding, std::unordered_set<const Tool*>> edges;
+			std::unordered_set<const Tool*> selfReferences;
+			bool isFirstNode;
+		};
+
 		ImageRender __renderer;
 		Gtk::ScrolledWindow __scrollable;
+		const Serializer& __serializer;
 
 		Gtk::Button __update;
 
+		std::unordered_set<Edge> singleChain(std::unordered_set<const Tool*> tools) {
+			std::unordered_set<ToolBinding> todo;
+			{ // argmin
+				const Tool* tmp = nullptr;
+				size_t counter = 0;
+				for(auto& i : tools) {
+					size_t iCounter = i->requiredFields().size();
+					if(tmp == nullptr) {
+						tmp = i;
+						counter = iCounter;
+					}
+					else if(counter > iCounter) {
+						tmp = i;
+						counter = iCounter;
+					}
+				}
+				if(tmp == nullptr)
+					return {};
+				else {
+					Tool tmpTool;
+					for(auto& i : tmp->requiredFields()) {
+						auto tmp2 = tmp->getStatesFields().find(i);
+						tmpTool.setFieldState(*(tmp2->second.begin()->first), *i, FIELD_STATE::READ);
+					}
+					todo.insert({tmpTool});
+				}
+			}
+
+			std::unordered_set<ToolBinding> done;
+			std::unordered_set<Edge> result;
+			while(todo.size() > 0) { // Tools todo
+				ToolBinding currentState;
+				{ // Remove any
+					auto tmp = todo.begin();
+					currentState = std::move(*tmp);
+					todo.erase(tmp);
+				}
+				done.insert(currentState);
+
+				for(auto& i : tools) {
+					if(subset(i->requiredFields(), currentState.tool.requiredFields())) {
+						Tool nextState = currentState.tool;
+						for(auto& j : i->generatedFields()) {
+							auto tmp = i->getStatesFields().find(j);
+							if(tmp == i->getStatesFields().end())
+								throw; // That should never happen
+							nextState.setFieldState(*(tmp->second.begin()->first), *j, FIELD_STATE::READ);
+						}
+
+						if(nextState.isValid()) {
+							result.insert({currentState, i, {nextState}});
+							if(done.find({nextState}) == done.end())
+								todo.insert({nextState});
+						}
+					}
+				}
+			}
+
+			return result;
+		}
+
+		std::unordered_set<Edge> chain(std::unordered_set<const Tool*> tools) {
+			std::unordered_set<Edge> result;
+
+			std::unordered_set<Edge> nextChain = singleChain(tools);
+			while(!subset(nextChain, result)) {
+				for(auto& i : nextChain) {
+					auto tmp = tools.find(i.tool);
+					if(tmp != tools.end())
+						tools.erase(tmp);
+				}
+				result.insert(nextChain.begin(), nextChain.end());
+				nextChain = singleChain(tools);
+			}
+
+			return result;
+		}
+
+		std::string genFile(auto statesSource, auto edgesSource) {
+			// Gen dot file
+			std::string file = tmpnam(nullptr);
+			{
+				// Generate output
+				std::ofstream output(file + ".gv", std::ios::binary | std::ios::out);
+				output << "digraph G {\n";
+
+				// Generate nodes
+				std::unordered_map<ToolBinding, size_t> states;
+				{
+					size_t counter = 0;
+					statesSource([&](const ToolBinding& state, bool isStart) -> void {
+						// Set data
+						states[state] = counter;
+
+						// Write node
+						output << "n" << counter << " [label=\"";
+						if(isStart) {
+							bool first = true;
+							for(auto& i : state.tool.getStatesFields())
+								if(state.tool.getFieldTransitiveState(*(i.first)) >= FIELD_STATE::READ) {
+									if(first)
+										first = false;
+									else
+										output << "\\n";
+
+									for(auto& j : i.second)
+										if(j.second >= FIELD_STATE::READ)
+											output << j.first->getName();
+									output << "::" << i.first->getName();
+								}
+						}
+						output << "\"];\n";
+
+						// Update counter
+						counter++;
+					});
+				}
+
+				// Generate edges
+				edgesSource([&](const ToolBinding& from, const std::unordered_set<const Tool*>& tools, const ToolBinding& to) -> void {
+					output << "n" << states[from] << " -> n" << states[to] << " [label=\"";
+					bool first = true;
+					for(auto& i : tools) {
+						if(first)
+							first = false;
+						else
+							output << "\\n";
+						output << i->getName();
+					}
+					output << "\"];\n";
+				});
+
+				output << "}";
+				output.close();
+			}
+
+			// Command
+			int result = runCommand({"dot", "-Tpng", file + ".gv", "-o", file + ".png"}, ".");
+			if(result != 0)
+				throw; // TODO: Remove
+			return file + ".png";
+		}
+
+		std::string showTools(const std::unordered_set<const Tool*>& tools) {
+			// Edges
+			auto edges = chain(tools);
+
+			// Convert representation
+			std::unordered_map<ToolBinding, NodeInfo> nodeInfo;
+			for(auto& i : edges) {
+				// Add from state
+				{
+					auto tmp = nodeInfo.find(i.from);
+					if(tmp == nodeInfo.end())
+						nodeInfo[i.from] = {{}, {}, true};
+				}
+
+				auto& tmp = nodeInfo[i.from];
+				if(i.from == i.to) // Self reference
+					tmp.selfReferences.insert(i.tool);
+				else { // Real edge
+					{ // Insert edge
+						auto tmp2 = tmp.edges.find(i.to);
+						if(tmp2 == tmp.edges.end())
+							tmp.edges.insert({i.to, {i.tool}});
+						else
+							tmp2->second.insert(i.tool);
+					}
+
+					{ // to state info
+						auto tmp2 = nodeInfo.find(i.to);
+						if(tmp2 == nodeInfo.end())
+							nodeInfo[i.to] = {{}, {}, false};
+						else
+							tmp2->second.isFirstNode = false;
+					}
+				}
+			}
+
+			// TODO: Remove doubles
+			// TODO: Remove unused created
+
+			// Draw and show
+			return this->genFile([&](auto func) -> void {
+				for(auto& i : nodeInfo)
+					func(i.first, i.second.isFirstNode);
+			}, [&](auto func) -> void {
+				for(auto& i : nodeInfo) {
+					for(auto& j : i.second.edges)
+						func(i.first, j.second, j.first);
+					if(i.second.selfReferences.size() > 0)
+						func(i.first, i.second.selfReferences, i.first);
+				}
+			});
+		}
+
 	public:
-		DependencieGraph() {
+		DependencieGraph(const Serializer& serializer) : __serializer(serializer) {
 			// Layout
 			this->__update = Gtk::Button("Update");
 			this->__scrollable.add(this->__renderer);
@@ -124,7 +390,7 @@ class DependencieGraph : public Gtk::VBox {
 
 			// Button
 			this->__update.signal_clicked().connect([this]() -> void {
-				this->__renderer.loadImage("test.png"); // TODO: Calculate and draw correct diagram
+				this->__renderer.loadImage(showTools({this->__serializer.getTools().begin(), this->__serializer.getTools().end()}));
 			});
 		}
 };
@@ -989,7 +1255,7 @@ class Overview : public Gtk::VBox {
 		}
 
 	public:
-		Overview(Transactions& transactions) : Gtk::VBox(), transactions(transactions) {
+		Overview(Transactions& transactions) : Gtk::VBox(), transactions(transactions), graph(transactions.getData()) {
 			// Init Stack
 			this->stack.add(this->tool_paned, "Tool Overview", "Tool Overview");
 			this->stack.add(this->graph, "Tool Relations", "Tool Relations");

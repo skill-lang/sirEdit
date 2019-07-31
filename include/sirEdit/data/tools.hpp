@@ -3,6 +3,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <sirEdit/data/fields.hpp>
 #include <sirEdit/data/types.hpp>
@@ -472,6 +473,145 @@ namespace sirEdit::data {
 						result += this->getCommand().substr(current, tmp - current) + "java -jar codegen.jar " + spec;
 						current = tmp + 8;
 					}
+				}
+				return result;
+			}
+
+			/**
+			 * Check if tool is valid.
+			 * @param is a valid tool specification
+			 */
+			bool isValid() const {
+				// List types and fields
+				std::unordered_set<const Type*> types;
+				std::unordered_set<const Field*> fields;
+				{
+					std::unordered_set<const Type*> todoTypes;
+					std::unordered_set<const Field*> todoFields;
+
+					for(auto& i : this->__statesType) // Add all set types
+						todoTypes.insert(i.first);
+					for(auto& i : this->__statesFields) // Add all types that set a field
+						for(auto& j : i.second)
+							todoTypes.insert(j.first);
+
+					while(todoTypes.size() > 0 || todoFields.size() > 0) { // Run as long as a type or field has to be processed
+						while(todoTypes.size() > 0) { // Add missing types
+							const Type* tmp;
+							{
+								auto tmp2 = todoTypes.begin();
+								tmp = *tmp2;
+								todoTypes.erase(tmp2);
+							}
+
+							if(types.find(tmp) == types.end()) { // Add missing type
+								types.insert(tmp);
+
+								{ // Add super type
+									const Type* super = getSuper(*tmp);
+									if(super != nullptr)
+										if(types.find(super) == types.end())
+											todoTypes.insert(super);
+								}
+
+								{ // Add interfaces
+									auto& interfaces = getInterfaces(*tmp);
+									for(const Type* i : interfaces)
+										if(types.find(i) == types.end())
+											todoTypes.insert(i);
+								}
+
+								{ // Find fields
+									auto& tmpFields = getFields(*tmp);
+									for(const Field& i : tmpFields)
+										if(fields.find(&i) == fields.end())
+											todoFields.insert(&i);
+								}
+							}
+						}
+
+						while(todoFields.size() > 0) { // Add missing fields
+							const Field* tmp;
+							{
+								auto tmp2 = todoFields.begin();
+								tmp = *tmp2;
+								todoFields.erase(tmp2);
+							}
+
+							while(tmp != nullptr) {
+								if(fields.find(tmp) == fields.end()) { // Add missing field
+									fields.insert(tmp);
+
+									for(const Type* i : tmp->getType().types) // Add types
+										if(types.find(i) == types.end())
+											todoTypes.insert(i);
+								}
+
+								tmp = tmp->getMeta().view;
+							}
+						}
+					}
+				}
+
+				// Unset types
+				for(auto& i : this->__statesType)
+					if(std::get<1>(i.second) == TYPE_STATE::UNUSED)
+						if(this->getTypeTransitiveState(*(i.first)) >= TYPE_STATE::READ)
+							return false;
+
+				// Unset fields
+				for(auto& i : this->__statesFields)
+					for(auto& j : i.second)
+						if(j.second == FIELD_STATE::UNUSED)
+							if(this->getFieldTransitiveState(*(i.first)) >= FIELD_STATE::READ)
+								return false;
+
+				// Check coliding types
+				for(auto& i : types)
+					for(auto& j : i->getCollides())
+						if(this->getTypeTransitiveState(*i) >= TYPE_STATE::READ && this->getTypeTransitiveState(*j) >= TYPE_STATE::READ)
+							return false;
+
+				// Check coliding fields
+				for(auto& i : fields)
+					for(auto& j : i->getCollide())
+						if(this->getFieldTransitiveState(*i) >= FIELD_STATE::READ && this->getFieldTransitiveState(*j) >= FIELD_STATE::READ)
+							return false;
+
+				return true;
+			}
+
+			/**
+			 * Generates a list of fields that at least readed but not created.
+			 * @return fields that the tool needs
+			 */
+			std::unordered_set<const Field*> requiredFields() const {
+				std::unordered_set<const Field*> result;
+				for(auto& i : this->__statesFields) {
+					const Field* tmp = i.first;
+					while(tmp->getMeta().view != nullptr)
+						tmp = tmp->getMeta().view;
+
+					auto state = this->getFieldTransitiveState(*tmp);
+					if(state >= FIELD_STATE::READ && state != FIELD_STATE::CREATE)
+						result.insert(tmp);
+				}
+				return result;
+			}
+
+			/**
+			 * Generates a list of fields that create the fields
+			 * @return fields that the tool creates
+			 */
+			std::unordered_set<const Field*> generatedFields() const {
+				std::unordered_set<const Field*> result;
+				for(auto& i : this->__statesFields) {
+					const Field* tmp = i.first;
+					while(tmp->getMeta().view != nullptr)
+						tmp = tmp->getMeta().view;
+
+					if(this->getFieldTransitiveState(*tmp) == FIELD_STATE::CREATE)
+						result.insert(tmp);
 				}
 				return result;
 			}
