@@ -707,6 +707,8 @@ class Overview : public Gtk::VBox {
 								default:
 									throw; // That should never happen
 							}
+
+							typesSet->pack_start(*(createLabel(j.first->getName() + "." + i.first->getName() + " : " + state)), false, false);
 						}
 			}
 

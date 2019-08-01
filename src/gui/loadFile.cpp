@@ -154,5 +154,14 @@ extern void sirEdit::loadFile(Gtk::Window* window, Gtk::FileChooserNative* choos
 	if(files.size() != 1)
 		throw; // TODO: Show error
 	auto file = files[0];
-	loader_thread = move(thread([window, file]() -> void { loadFileThread(window, nullptr, file); }));
+	loader_thread = move(thread([window, file]() -> void {
+		try {
+			loadFileThread(window, nullptr, file);
+		}
+		catch(...) {
+			sirEdit::runInGui([]() -> void {
+				Gtk::manage(new Gtk::MessageDialog("Can't load file. Is it in SIR-representaiton? When not try to use the import.", false, Gtk::MessageType::MESSAGE_ERROR));
+			});
+		}
+	}));
 }
