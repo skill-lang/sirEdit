@@ -178,6 +178,7 @@ class DependencieGraph : public Gtk::VBox {
 			bool isFirstNode;
 
 			std::unordered_set<const Tool*> knownTools = {};
+			std::unordered_map<ToolBinding, std::unordered_set<const Tool*>> backEdges = {};
 		};
 
 		ImageRender __renderer;
@@ -361,6 +362,12 @@ class DependencieGraph : public Gtk::VBox {
 							nodeInfo[i.to] = {{}, {}, false};
 						else
 							tmp2->second.isFirstNode = false;
+
+						auto tmp3 = nodeInfo[i.to].backEdges.find(i.from);
+						if(tmp3 == nodeInfo[i.to].backEdges.end())
+							nodeInfo[i.to].backEdges[i.from] = {i.tool};
+						else
+							nodeInfo[i.to].backEdges[i.from].insert(i.tool);
 					}
 				}
 			}
@@ -412,7 +419,73 @@ class DependencieGraph : public Gtk::VBox {
 					for(auto& j : i.second.knownTools)
 						i.second.selfReferences.erase(j);
 			}
-			// TODO: Remove unused created
+
+			{ // Remove unused diamonds
+				// Find ende nodes
+				std::unordered_set<ToolBinding> todo;
+				for(auto& i : nodeInfo)
+					if(i.second.edges.size() == 0)
+						todo.insert(i.first);
+
+				while(todo.size() > 0) { // Remove all edges that do not required
+					ToolBinding i; // Take an todo
+					{
+						auto tmp = todo.begin();
+						i = std::move(*tmp);
+						todo.erase(tmp);
+					}
+
+					auto& iData = nodeInfo[i];
+					if(iData.selfReferences.size() > 0) // Nothing to do
+						continue;
+
+					// Check edges
+					std::unordered_set<ToolBinding> edgesToRemove;
+					for(auto& j : iData.edges) {
+						bool found = false;
+						for(auto& k : j.second) {
+							for(auto& l : k->requiredFields()) {
+								for(auto& m : iData.backEdges) {
+									for(auto& n : m.second) {
+										auto tmp = n->generatedFields();
+										if(tmp.find(l) != tmp.end()) {
+											found = true;
+											break;
+										}
+									}
+									if(found)
+										break;
+								}
+								if(found)
+									break;
+							}
+							if(found)
+								break;
+						}
+
+						if(!found)
+							edgesToRemove.insert(j.first);
+					}
+
+					// Remove edges
+					if(edgesToRemove.size() > 0 || iData.edges.size() == 0)
+						for(auto& j : iData.backEdges)
+							todo.insert(j.first);
+					for(auto& j : edgesToRemove) {
+						iData.edges.erase(j);
+						nodeInfo[j].backEdges.erase(i);
+					}
+				}
+
+				{ // Remove empty nodes
+					std::unordered_set<ToolBinding> toRemove;
+					for(auto& i : nodeInfo)
+						if(i.second.edges.size() == 0 && i.second.selfReferences.size() == 0 && i.second.backEdges.size() == 0)
+							toRemove.insert(i.first);
+					for(auto& i : toRemove)
+						nodeInfo.erase(i);
+				}
+			}
 
 			// Draw and show
 			return this->genFile([&](auto func) -> void {
