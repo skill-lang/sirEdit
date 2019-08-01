@@ -176,6 +176,8 @@ class DependencieGraph : public Gtk::VBox {
 			std::unordered_map<ToolBinding, std::unordered_set<const Tool*>> edges;
 			std::unordered_set<const Tool*> selfReferences;
 			bool isFirstNode;
+
+			std::unordered_set<const Tool*> knownTools = {};
 		};
 
 		ImageRender __renderer;
@@ -363,7 +365,53 @@ class DependencieGraph : public Gtk::VBox {
 				}
 			}
 
-			// TODO: Remove doubles
+			// Remove double
+			{
+				std::unordered_set<ToolBinding> todo; // Find first nodes and prepare
+				for(auto& i : nodeInfo) {
+					i.second.knownTools = i.second.selfReferences;
+					if(i.second.isFirstNode)
+						todo.insert(i.first);
+				}
+
+				// Update types
+				while(todo.size() > 0) {
+					ToolBinding i; // Parse node
+					{
+						auto tmp = todo.begin();
+						i = std::move(*tmp);
+						todo.erase(i);
+					}
+
+					auto& tmp2 = nodeInfo[i];
+					for(auto& j : tmp2.edges) {
+						// Find not referenced tools
+						auto& tmp = nodeInfo[j.first];
+						std::unordered_set<const Tool*> toRemove;
+						for(auto& k : tmp.knownTools) {
+							if(tmp2.knownTools.find(k) != tmp2.knownTools.end()) // Is local known
+								continue;
+							if(j.second.find(k) != j.second.end())
+								continue;
+							if(tmp2.selfReferences.find(k) != tmp2.selfReferences.end())
+								continue;
+							toRemove.insert(k);
+						}
+
+						// Remove not referenced tools
+						for(auto& k : toRemove)
+							tmp.knownTools.erase(k);
+
+						// Add modified to todo
+						todo.insert(j.first);
+					}
+				}
+
+				// Do cleanup
+				for(auto& i : nodeInfo)
+					for(auto& j : i.second.knownTools)
+						i.second.selfReferences.erase(j);
+			}
 			// TODO: Remove unused created
 
 			// Draw and show
